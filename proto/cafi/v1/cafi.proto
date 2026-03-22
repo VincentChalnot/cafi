@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package cafi.v1;
+
+option go_package = "github.com/VincentChalnot/cafi/internal/proto/cafi/v1;cafiv1";
+
+// EventType describes whether a file event is an upsert or a deletion.
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_UPSERT = 1;
+  EVENT_TYPE_DELETED = 2;
+}
+
+// Handshake is the first message the client sends after opening a Sync stream.
+message Handshake {
+  string client_version = 1;
+  string source_id = 2;
+}
+
+// FileEvent describes a filesystem change on the client side.
+message FileEvent {
+  string blake3 = 1;
+  string path = 2;
+  int64 mtime = 3;
+  int64 size = 4;
+  string mime_type = 5;
+  EventType event_type = 6;
+}
+
+// ClientMessage is the envelope sent by the client on the Sync stream.
+message ClientMessage {
+  oneof message {
+    Handshake handshake = 1;
+    FileEvent file_event = 2;
+  }
+}
+
+// EventAck confirms that an event was persisted on the server.
+message EventAck {
+  string blake3 = 1;
+  string path = 2;
+}
+
+// PullRequest is reserved for v1 and is never emitted in v0.
+message PullRequest {}
+
+// SyncError reports an error to the client.
+message SyncError {
+  string message = 1;
+  bool fatal = 2;
+}
+
+// ServerMessage is the envelope sent by the server on the Sync stream.
+message ServerMessage {
+  oneof message {
+    EventAck event_ack = 1;
+    PullRequest pull_request = 2;
+    SyncError sync_error = 3;
+  }
+}
+
+// Indexer is the main gRPC service for file indexing.
+service Indexer {
+  // Sync is a bidirectional streaming RPC for synchronizing file events.
+  rpc Sync(stream ClientMessage) returns (stream ServerMessage) {}
+}
