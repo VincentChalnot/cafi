@@ -4,7 +4,9 @@ go 1.24.13
 
 require (
 	github.com/jackc/pgx/v5 v5.7.5
+	github.com/mattn/go-sqlite3 v1.14.37
 	github.com/spf13/viper v1.20.1
+	github.com/zeebo/blake3 v0.2.4
 	golang.org/x/crypto v0.37.0
 	google.golang.org/grpc v1.67.3
 	google.golang.org/protobuf v1.36.1
@@ -16,6 +18,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
