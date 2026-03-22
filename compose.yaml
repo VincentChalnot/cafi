@@ -1,0 +1,32 @@
+services:
+  paradedb:
+    image: paradedb/paradedb:latest
+    environment:
+      POSTGRES_USER: cafi
+      POSTGRES_PASSWORD: cafi
+      POSTGRES_DB: cafi
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cafi -d cafi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cafi-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      paradedb:
+        condition: service_healthy
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./config.yaml:/etc/cafi/config.yaml:ro
+    command: ["--config", "/etc/cafi/config.yaml"]
+
+volumes:
+  pgdata:
