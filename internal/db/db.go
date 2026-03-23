@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -35,65 +34,281 @@ func (d *DB) RunMigrations(ctx context.Context) error {
 	return nil
 }
 
-// UpsertUser ensures a user row exists.
-func (d *DB) UpsertUser(ctx context.Context, id string) error {
-	_, err := d.Pool.Exec(ctx,
-		`INSERT INTO users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`, id)
-	return err
+// --- Users ---
+
+// CreateUser inserts a new user row and returns the generated ID.
+func (d *DB) CreateUser(ctx context.Context, username string) (int, error) {
+	var id int
+	err := d.Pool.QueryRow(ctx,
+		`INSERT INTO users (username) VALUES ($1) RETURNING id`, username).Scan(&id)
+	return id, err
 }
 
-// UpsertSource ensures a source row exists, updating the token hash if needed.
-func (d *DB) UpsertSource(ctx context.Context, id, userID, tokenHash string) error {
-	_, err := d.Pool.Exec(ctx,
-		`INSERT INTO sources (id, user_id, token_hash)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (id) DO UPDATE SET token_hash = EXCLUDED.token_hash`,
-		id, userID, tokenHash)
-	return err
+// DeleteUser removes a user by username.
+func (d *DB) DeleteUser(ctx context.Context, username string) error {
+	ct, err := d.Pool.Exec(ctx, `DELETE FROM users WHERE username = $1`, username)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("user %q not found", username)
+	}
+	return nil
 }
 
-// DeleteUser removes a user and all their sources.
-func (d *DB) DeleteUser(ctx context.Context, id string) error {
-	_, err := d.Pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
-	return err
+// GetUserID returns the user ID for a given username.
+func (d *DB) GetUserID(ctx context.Context, username string) (int, error) {
+	var id int
+	err := d.Pool.QueryRow(ctx, `SELECT id FROM users WHERE username = $1`, username).Scan(&id)
+	return id, err
 }
 
-// DeleteSource removes a source.
-func (d *DB) DeleteSource(ctx context.Context, id string) error {
-	_, err := d.Pool.Exec(ctx, `DELETE FROM sources WHERE id = $1`, id)
-	return err
-}
-
-// ListUsers returns all user IDs.
+// ListUsers returns all usernames.
 func (d *DB) ListUsers(ctx context.Context) ([]string, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT id FROM users ORDER BY id`)
+	rows, err := d.Pool.Query(ctx, `SELECT username FROM users ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var ids []string
+	var names []string
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		var name string
+		if err := rows.Scan(&name); err != nil {
 			return nil, err
 		}
-		ids = append(ids, id)
+		names = append(names, name)
 	}
-	return ids, rows.Err()
+	return names, rows.Err()
 }
 
-// UpdateSourceToken updates the token hash for a source.
-func (d *DB) UpdateSourceToken(ctx context.Context, id, tokenHash string) error {
-	_, err := d.Pool.Exec(ctx,
-		`UPDATE sources SET token_hash = $1 WHERE id = $2`,
-		tokenHash, id)
-	return err
+// --- Sources ---
+
+// CreateSource inserts a new source and returns the generated ID.
+func (d *DB) CreateSource(ctx context.Context, userID int, code string, strategy int, path *string) (int, error) {
+	var id int
+	err := d.Pool.QueryRow(ctx,
+		`INSERT INTO sources (user_id, code, strategy, path) VALUES ($1, $2, $3, $4) RETURNING id`,
+		userID, code, strategy, path).Scan(&id)
+	return id, err
 }
+
+// DeleteSource removes a source by user_id and code.
+func (d *DB) DeleteSource(ctx context.Context, userID int, code string) error {
+	ct, err := d.Pool.Exec(ctx,
+		`DELETE FROM sources WHERE user_id = $1 AND code = $2`, userID, code)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("source %q not found for user %d", code, userID)
+	}
+	return nil
+}
+
+// UpdateSource updates strategy and/or path on a source.
+func (d *DB) UpdateSource(ctx context.Context, userID int, code string, strategy int, path *string) error {
+	ct, err := d.Pool.Exec(ctx,
+		`UPDATE sources SET strategy = $1, path = $2 WHERE user_id = $3 AND code = $4`,
+		strategy, path, userID, code)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("source %q not found for user %d", code, userID)
+	}
+	return nil
+}
+
+// GetSourceID returns the source ID for a user_id and code.
+func (d *DB) GetSourceID(ctx context.Context, userID int, code string) (int, error) {
+	var id int
+	err := d.Pool.QueryRow(ctx,
+		`SELECT id FROM sources WHERE user_id = $1 AND code = $2`, userID, code).Scan(&id)
+	return id, err
+}
+
+// SourceInfo holds basic information about a source.
+type SourceInfo struct {
+	ID       int
+	UserID   int
+	Code     string
+	Strategy int
+	Path     *string
+}
+
+// ListSources returns all sources.
+func (d *DB) ListSources(ctx context.Context) ([]SourceInfo, error) {
+	rows, err := d.Pool.Query(ctx, `SELECT id, user_id, code, strategy, path FROM sources ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sources []SourceInfo
+	for rows.Next() {
+		var s SourceInfo
+		if err := rows.Scan(&s.ID, &s.UserID, &s.Code, &s.Strategy, &s.Path); err != nil {
+			return nil, err
+		}
+		sources = append(sources, s)
+	}
+	return sources, rows.Err()
+}
+
+// --- Tokens ---
+
+// CreateToken inserts a token and returns the generated ID.
+func (d *DB) CreateToken(ctx context.Context, userID int, name, tokenHash string, expireAt string) (int, error) {
+	var id int
+	err := d.Pool.QueryRow(ctx,
+		`INSERT INTO tokens (user_id, name, token_hash, expire_at)
+		 VALUES ($1, $2, $3, $4::timestamptz) RETURNING id`,
+		userID, name, tokenHash, expireAt).Scan(&id)
+	return id, err
+}
+
+// DeleteToken removes a token by user_id and name.
+func (d *DB) DeleteToken(ctx context.Context, userID int, name string) error {
+	ct, err := d.Pool.Exec(ctx,
+		`DELETE FROM tokens WHERE user_id = $1 AND name = $2`, userID, name)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("token %q not found for user %d", name, userID)
+	}
+	return nil
+}
+
+// RefreshToken atomically replaces the token hash for a token.
+func (d *DB) RefreshToken(ctx context.Context, userID int, name, tokenHash string, expireAt string) error {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	ct, err := tx.Exec(ctx,
+		`UPDATE tokens SET token_hash = $1, expire_at = $2::timestamptz WHERE user_id = $3 AND name = $4`,
+		tokenHash, expireAt, userID, name)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("token %q not found for user %d", name, userID)
+	}
+	return tx.Commit(ctx)
+}
+
+// GetTokenID returns the token ID for a user_id and name.
+func (d *DB) GetTokenID(ctx context.Context, userID int, name string) (int, error) {
+	var id int
+	err := d.Pool.QueryRow(ctx,
+		`SELECT id FROM tokens WHERE user_id = $1 AND name = $2`, userID, name).Scan(&id)
+	return id, err
+}
+
+// AddTokenSources adds source_id entries to token_sources.
+func (d *DB) AddTokenSources(ctx context.Context, tokenID int, sourceIDs []int) error {
+	for _, sid := range sourceIDs {
+		_, err := d.Pool.Exec(ctx,
+			`INSERT INTO token_sources (token_id, source_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			tokenID, sid)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RemoveTokenSources removes source_id entries from token_sources.
+func (d *DB) RemoveTokenSources(ctx context.Context, tokenID int, sourceIDs []int) error {
+	for _, sid := range sourceIDs {
+		_, err := d.Pool.Exec(ctx,
+			`DELETE FROM token_sources WHERE token_id = $1 AND source_id = $2`,
+			tokenID, sid)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// --- Auth token resolution ---
+
+// TokenInfo holds the token hash, user_id, and linked source IDs for auth.
+type TokenInfo struct {
+	TokenID   int
+	UserID    int
+	TokenHash string
+	SourceIDs []int
+}
+
+// GetAllTokens retrieves all non-expired tokens with their source IDs.
+func (d *DB) GetAllTokens(ctx context.Context) ([]TokenInfo, error) {
+	rows, err := d.Pool.Query(ctx,
+		`SELECT t.id, t.user_id, t.token_hash
+		 FROM tokens t
+		 WHERE t.expire_at > now()`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tokens []TokenInfo
+	for rows.Next() {
+		var ti TokenInfo
+		if err := rows.Scan(&ti.TokenID, &ti.UserID, &ti.TokenHash); err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, ti)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Load source_ids for each token
+	for i := range tokens {
+		srcRows, err := d.Pool.Query(ctx,
+			`SELECT source_id FROM token_sources WHERE token_id = $1`, tokens[i].TokenID)
+		if err != nil {
+			return nil, err
+		}
+		for srcRows.Next() {
+			var sid int
+			if err := srcRows.Scan(&sid); err != nil {
+				srcRows.Close()
+				return nil, err
+			}
+			tokens[i].SourceIDs = append(tokens[i].SourceIDs, sid)
+		}
+		srcRows.Close()
+		if err := srcRows.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return tokens, nil
+}
+
+// GetSourceCodeToID returns a map of source code to source ID for the given source IDs.
+func (d *DB) GetSourceCodeToID(ctx context.Context, sourceIDs []int) (map[string]int, error) {
+	result := make(map[string]int)
+	for _, sid := range sourceIDs {
+		var code string
+		err := d.Pool.QueryRow(ctx, `SELECT code FROM sources WHERE id = $1`, sid).Scan(&code)
+		if err != nil {
+			return nil, err
+		}
+		result[code] = sid
+	}
+	return result, nil
+}
+
+// --- Blobs ---
 
 // UpsertBlob inserts a blob row if it does not exist and returns its ID.
-func (d *DB) UpsertBlob(ctx context.Context, blake3, mimeType string, size int64) (int64, error) {
-	var id int64
+func (d *DB) UpsertBlob(ctx context.Context, blake3, mimeType string, size int64) (int, error) {
+	var id int
 	err := d.Pool.QueryRow(ctx,
 		`INSERT INTO blobs (blake3, mime_type, size)
 		 VALUES ($1, $2, $3)
@@ -103,8 +318,10 @@ func (d *DB) UpsertBlob(ctx context.Context, blake3, mimeType string, size int64
 	return id, err
 }
 
+// --- File Paths ---
+
 // UpsertFilePath inserts or updates a file path entry.
-func (d *DB) UpsertFilePath(ctx context.Context, sourceID, folder, filename string, blobID int64, mtime int64) error {
+func (d *DB) UpsertFilePath(ctx context.Context, sourceID int, folder, filename string, blobID int, mtime int64) error {
 	_, err := d.Pool.Exec(ctx,
 		`INSERT INTO file_paths (source_id, folder, filename, blob_id, mtime, last_seen_at, deleted_at)
 		 VALUES ($1, $2, $3, $4, $5, now(), NULL)
@@ -118,86 +335,36 @@ func (d *DB) UpsertFilePath(ctx context.Context, sourceID, folder, filename stri
 }
 
 // MarkFileDeleted sets deleted_at on a file path entry.
-func (d *DB) MarkFileDeleted(ctx context.Context, sourceID, folder, filename string) error {
+func (d *DB) MarkFileDeleted(ctx context.Context, sourceID int, folder, filename string) error {
 	_, err := d.Pool.Exec(ctx,
 		`UPDATE file_paths SET deleted_at = now() WHERE source_id = $1 AND folder = $2 AND filename = $3`,
 		sourceID, folder, filename)
 	return err
 }
 
-// SourceToken holds a source ID and its bcrypt token hash.
-type SourceToken struct {
-	SourceID  string
-	TokenHash string
-}
-
-// SourceInfo holds basic information about a source.
-type SourceInfo struct {
-	ID     string
-	UserID string
-}
-
-// ListSources returns all sources.
-func (d *DB) ListSources(ctx context.Context) ([]SourceInfo, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT id, user_id FROM sources ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var sources []SourceInfo
-	for rows.Next() {
-		var s SourceInfo
-		if err := rows.Scan(&s.ID, &s.UserID); err != nil {
-			return nil, err
-		}
-		sources = append(sources, s)
-	}
-	return sources, rows.Err()
-}
-
-// GetAllSourceTokens retrieves all source IDs and their token hashes.
-func (d *DB) GetAllSourceTokens(ctx context.Context) ([]SourceToken, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT id, token_hash FROM sources`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var tokens []SourceToken
-	for rows.Next() {
-		var st SourceToken
-		if err := rows.Scan(&st.SourceID, &st.TokenHash); err != nil {
-			return nil, err
-		}
-		tokens = append(tokens, st)
-	}
-	return tokens, rows.Err()
-}
-
 // FilePathRow represents a row from file_paths joined with blobs.
 type FilePathRow struct {
-	SourceID string
+	SourceID int
 	Folder   string
 	Filename string
 	Blake3   string
 	MimeType *string
 	Size     int64
 	Mtime    int64
-	LastSeen time.Time
 }
 
-// QueryFilePaths queries file_paths joined with blobs. Supports optional source and LIKE pattern filters on the full path.
-func (d *DB) QueryFilePaths(ctx context.Context, sourceID, likePattern string) ([]FilePathRow, error) {
-	query := `SELECT fp.source_id, fp.folder, fp.filename, b.blake3, b.mime_type, b.size, fp.mtime, fp.last_seen_at
+// QueryFilePaths queries file_paths joined with blobs. Supports optional source ID list and LIKE filter.
+func (d *DB) QueryFilePaths(ctx context.Context, sourceIDs []int, likePattern string) ([]FilePathRow, error) {
+	query := `SELECT fp.source_id, fp.folder, fp.filename, b.blake3, b.mime_type, b.size, fp.mtime
 	          FROM file_paths fp
 	          JOIN blobs b ON fp.blob_id = b.id
 	          WHERE fp.deleted_at IS NULL`
 	var args []any
 	argIdx := 1
 
-	if sourceID != "" {
-		query += fmt.Sprintf(" AND fp.source_id = $%d", argIdx)
-		args = append(args, sourceID)
+	if len(sourceIDs) > 0 {
+		query += fmt.Sprintf(" AND fp.source_id = ANY($%d)", argIdx)
+		args = append(args, sourceIDs)
 		argIdx++
 	}
 	if likePattern != "" {
@@ -216,10 +383,22 @@ func (d *DB) QueryFilePaths(ctx context.Context, sourceID, likePattern string) (
 	var results []FilePathRow
 	for rows.Next() {
 		var r FilePathRow
-		if err := rows.Scan(&r.SourceID, &r.Folder, &r.Filename, &r.Blake3, &r.MimeType, &r.Size, &r.Mtime, &r.LastSeen); err != nil {
+		if err := rows.Scan(&r.SourceID, &r.Folder, &r.Filename, &r.Blake3, &r.MimeType, &r.Size, &r.Mtime); err != nil {
 			return nil, err
 		}
 		results = append(results, r)
 	}
 	return results, rows.Err()
+}
+
+// DeleteFilePathsBySource removes all file_paths for a specific source.
+func (d *DB) DeleteFilePathsBySource(ctx context.Context, sourceID int) error {
+	_, err := d.Pool.Exec(ctx, `DELETE FROM file_paths WHERE source_id = $1`, sourceID)
+	return err
+}
+
+// DeleteSourceByID removes a source by its integer ID.
+func (d *DB) DeleteSourceByID(ctx context.Context, sourceID int) error {
+	_, err := d.Pool.Exec(ctx, `DELETE FROM sources WHERE id = $1`, sourceID)
+	return err
 }

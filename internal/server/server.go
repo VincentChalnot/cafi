@@ -28,9 +28,14 @@ func NewIndexerServer(database *db.DB) *IndexerServer {
 func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 	ctx := stream.Context()
 
-	sourceID, ok := auth.SourceIDFromContext(ctx)
+	_, ok := auth.UserIDFromContext(ctx)
 	if !ok {
-		return status.Error(codes.Internal, "source_id not found in context")
+		return status.Error(codes.Internal, "user_id not found in context")
+	}
+
+	sourceMap, ok := auth.SourceMapFromContext(ctx)
+	if !ok {
+		return status.Error(codes.Internal, "source_map not found in context")
 	}
 
 	// Expect Handshake as first message
@@ -42,12 +47,13 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 	if hs == nil {
 		return status.Error(codes.InvalidArgument, "first message must be a Handshake")
 	}
-	log.Printf("Sync started: source=%s version=%s", sourceID, hs.GetClientVersion())
 
-	// Validate that the handshake source_id matches the authenticated source
-	if hs.GetSourceId() != sourceID {
-		return status.Error(codes.PermissionDenied, "source_id mismatch")
+	// Validate the handshake source_code against authenticated sources
+	hsSourceCode := hs.GetSourceCode()
+	if _, ok := sourceMap[hsSourceCode]; !ok {
+		return sendFatalSyncError(stream, "source_code not accessible via this token")
 	}
+	log.Printf("Sync started: source=%s version=%s", hsSourceCode, hs.GetClientVersion())
 
 	// Process file events
 	for {
@@ -62,6 +68,24 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 		fe := msg.GetFileEvent()
 		if fe == nil {
 			continue
+		}
+
+		// Resolve source_code for this event
+		sourceCode := fe.GetSourceCode()
+		if sourceCode == "" {
+			sourceCode = hsSourceCode
+		}
+		sourceID, ok := sourceMap[sourceCode]
+		if !ok {
+			sendErr := stream.Send(&cafiv1.ServerMessage{
+				Message: &cafiv1.ServerMessage_SyncError{
+					SyncError: &cafiv1.SyncError{Message: "source_code not accessible via this token", Fatal: true},
+				},
+			})
+			if sendErr != nil {
+				return sendErr
+			}
+			return status.Error(codes.PermissionDenied, "source_code not accessible via this token")
 		}
 
 		switch fe.GetEventType() {
@@ -117,7 +141,16 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 	}
 }
 
-func (s *IndexerServer) handleUpsert(ctx context.Context, sourceID string, fe *cafiv1.FileEvent) error {
+func sendFatalSyncError(stream cafiv1.Indexer_SyncServer, message string) error {
+	_ = stream.Send(&cafiv1.ServerMessage{
+		Message: &cafiv1.ServerMessage_SyncError{
+			SyncError: &cafiv1.SyncError{Message: message, Fatal: true},
+		},
+	})
+	return status.Error(codes.PermissionDenied, message)
+}
+
+func (s *IndexerServer) handleUpsert(ctx context.Context, sourceID int, fe *cafiv1.FileEvent) error {
 	blobID, err := s.DB.UpsertBlob(ctx, fe.GetBlake3(), fe.GetMimeType(), fe.GetSize())
 	if err != nil {
 		return err
@@ -126,7 +159,7 @@ func (s *IndexerServer) handleUpsert(ctx context.Context, sourceID string, fe *c
 	return s.DB.UpsertFilePath(ctx, sourceID, folder, filename, blobID, fe.GetMtime())
 }
 
-func (s *IndexerServer) handleDelete(ctx context.Context, sourceID string, fe *cafiv1.FileEvent) error {
+func (s *IndexerServer) handleDelete(ctx context.Context, sourceID int, fe *cafiv1.FileEvent) error {
 	folder, filename := path.Split(fe.GetPath())
 	return s.DB.MarkFileDeleted(ctx, sourceID, folder, filename)
 }
