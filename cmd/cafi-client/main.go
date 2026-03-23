@@ -64,6 +64,12 @@ func runScan(targetDir, serverAddr, sourceID, statePath string, parallelism int,
 		return fmt.Errorf("CAFI_TOKEN environment variable is required")
 	}
 
+	absTargetDir, err := filepath.Abs(targetDir)
+	if err != nil {
+		return fmt.Errorf("resolving absolute path for target dir: %w", err)
+	}
+	targetDir = absTargetDir
+
 	start := time.Now()
 
 	// Reset state if requested.
@@ -94,7 +100,7 @@ func runScan(targetDir, serverAddr, sourceID, statePath string, parallelism int,
 
 	// Step 2: Detect changes against existing state.
 	fmt.Println("Step 2: Detecting changes...")
-	stateEntries, err := stateDB.GetAll()
+	stateEntries, err := stateDB.GetAll(sourceID)
 	if err != nil {
 		return fmt.Errorf("reading state: %w", err)
 	}
@@ -102,7 +108,7 @@ func runScan(targetDir, serverAddr, sourceID, statePath string, parallelism int,
 
 	// Steps 3-4: Compute BLAKE3 hashes and detect MIME types.
 	fmt.Println("Steps 3-4: Computing BLAKE3 hashes and detecting MIME types...")
-	if err := scanner.ProcessCandidates(candidates); err != nil {
+	if err := scanner.ProcessCandidates(targetDir, candidates); err != nil {
 		return fmt.Errorf("processing candidates: %w", err)
 	}
 
@@ -125,7 +131,7 @@ func runScan(targetDir, serverAddr, sourceID, statePath string, parallelism int,
 	// Persist computed hashes for new and modified candidates.
 	for _, c := range candidates {
 		if c.Type != scanner.CandidatePendingRetry {
-			if err := stateDB.Upsert(c.Path, c.Blake3, c.Mtime, c.Size); err != nil {
+			if err := stateDB.Upsert(sourceID, c.Path, c.Blake3, c.Mtime, c.Size); err != nil {
 				return fmt.Errorf("updating state for %s: %w", c.Path, err)
 			}
 		}
@@ -188,7 +194,7 @@ func runScan(targetDir, serverAddr, sourceID, statePath string, parallelism int,
 				acked.Add(1)
 				path := msg.EventAck.GetPath()
 				mu.Lock()
-				if markErr := stateDB.MarkSent(path); markErr != nil {
+				if markErr := stateDB.MarkSent(sourceID, path); markErr != nil {
 					log.Printf("Warning: failed to mark sent for %s: %v", path, markErr)
 				}
 				mu.Unlock()
@@ -266,7 +272,7 @@ func runScan(targetDir, serverAddr, sourceID, statePath string, parallelism int,
 	// Remove state entries for deleted files after successful sync.
 	for _, p := range deleted {
 		mu.Lock()
-		if delErr := stateDB.Delete(p); delErr != nil {
+		if delErr := stateDB.Delete(sourceID, p); delErr != nil {
 			log.Printf("Warning: failed to delete state for %s: %v", p, delErr)
 		}
 		mu.Unlock()

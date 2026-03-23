@@ -1,0 +1,46 @@
+[tools]
+go = "1.25.0"
+buf = "latest"
+golangci-lint = "latest"
+"go:google.golang.org/protobuf/cmd/protoc-gen-go" = "latest"
+"go:google.golang.org/grpc/cmd/protoc-gen-go-grpc" = "latest"
+
+[tasks.proto]
+description = "Generate protobuf code using buf"
+run = "buf generate"
+
+[tasks.build]
+description = "Build all binaries"
+run = """
+CGO_ENABLED=1 go build -o bin/cafi-client ./cmd/cafi-client/
+CGO_ENABLED=0 go build -o bin/cafi-server ./cmd/cafi-server/
+CGO_ENABLED=0 go build -o bin/cafi-search ./cmd/cafi-search/
+"""
+
+[tasks.lint]
+description = "Run golangci-lint"
+run = "golangci-lint run ./..."
+
+[tasks.test]
+description = "Run tests"
+run = "CGO_ENABLED=1 go test ./..."
+
+[tasks.docker-build]
+description = "Build Docker image for cafi-server"
+run = "docker build -t cafi-server ."
+
+[tasks.run-server]
+description = "Run cafi-server"
+env.DATABASE_URL = "postgres://cafi:cafi@localhost:5434/cafi"
+run = "go run ./cmd/cafi-server serve"
+
+[tasks.run-client]
+description = "Run cafi-server"
+env.CAFI_TOKEN = "tok_live_6o0Qlmu5IBEAijsbhhNRhLtABojbxsST"
+run = "go run ./cmd/cafi-client scan ~/Pictures --source=pictures-vincent --reset-state"
+
+[tasks.run-search]
+description = "Run cafi-search"
+env.CAFI_DATABASE_URL = "postgres://cafi:cafi@localhost:5434/cafi"
+run = "go run ./cmd/cafi-search paths --filter='Screen*'"
+

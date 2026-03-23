@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"path"
 
 	"github.com/VincentChalnot/cafi/internal/auth"
 	"github.com/VincentChalnot/cafi/internal/db"
@@ -117,12 +118,15 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 }
 
 func (s *IndexerServer) handleUpsert(ctx context.Context, sourceID string, fe *cafiv1.FileEvent) error {
-	if err := s.DB.UpsertBlob(ctx, fe.GetBlake3(), fe.GetMimeType(), fe.GetSize()); err != nil {
+	blobID, err := s.DB.UpsertBlob(ctx, fe.GetBlake3(), fe.GetMimeType(), fe.GetSize())
+	if err != nil {
 		return err
 	}
-	return s.DB.UpsertFilePath(ctx, sourceID, fe.GetPath(), fe.GetBlake3(), fe.GetMtime())
+	folder, filename := path.Split(fe.GetPath())
+	return s.DB.UpsertFilePath(ctx, sourceID, folder, filename, blobID, fe.GetMtime())
 }
 
 func (s *IndexerServer) handleDelete(ctx context.Context, sourceID string, fe *cafiv1.FileEvent) error {
-	return s.DB.MarkFileDeleted(ctx, sourceID, fe.GetPath())
+	folder, filename := path.Split(fe.GetPath())
+	return s.DB.MarkFileDeleted(ctx, sourceID, folder, filename)
 }

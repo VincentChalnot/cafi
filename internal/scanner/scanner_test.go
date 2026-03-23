@@ -11,11 +11,74 @@ import (
 	"github.com/zeebo/blake3"
 )
 
+func TestWalkDirectory_RelativePaths(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	files := []string{
+		"a.txt",
+		"sub/b.txt",
+	}
+
+	for _, f := range files {
+		path := filepath.Join(tmpDir, f)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("hello"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	found, err := WalkDirectory(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(found) != len(files) {
+		t.Errorf("expected %d files, got %d", len(files), len(found))
+	}
+
+	for _, f := range files {
+		if _, ok := found[f]; !ok {
+			t.Errorf("expected to find %s in WalkDirectory results", f)
+		}
+	}
+}
+
+func TestProcessCandidates_RelativePaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	relPath := "a.txt"
+	absPath := filepath.Join(tmpDir, relPath)
+
+	if err := os.WriteFile(absPath, []byte("hello world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	candidates := []Candidate{
+		{
+			Type: CandidateNew,
+			Path: relPath,
+		},
+	}
+
+	err := ProcessCandidates(tmpDir, candidates)
+	if err != nil {
+		t.Fatalf("ProcessCandidates failed: %v", err)
+	}
+
+	if candidates[0].Blake3 == "" {
+		t.Error("expected Blake3 to be computed")
+	}
+	if !strings.Contains(candidates[0].MimeType, "text/plain") {
+		t.Errorf("expected text/plain, got %s", candidates[0].MimeType)
+	}
+}
+
 // ---------- DetectChanges tests ----------
 
 func TestDetectChanges_NewFile(t *testing.T) {
 	current := map[string]FileStat{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50},
 	}
 	state := map[string]*StateEntry{}
 
@@ -27,8 +90,8 @@ func TestDetectChanges_NewFile(t *testing.T) {
 	if candidates[0].Type != CandidateNew {
 		t.Errorf("expected CandidateNew, got %d", candidates[0].Type)
 	}
-	if candidates[0].Path != "/tmp/a.txt" {
-		t.Errorf("expected path /tmp/a.txt, got %s", candidates[0].Path)
+	if candidates[0].Path != "a.txt" {
+		t.Errorf("expected path a.txt, got %s", candidates[0].Path)
 	}
 	if len(deleted) != 0 {
 		t.Errorf("expected no deleted, got %d", len(deleted))
@@ -37,10 +100,10 @@ func TestDetectChanges_NewFile(t *testing.T) {
 
 func TestDetectChanges_ModifiedFile(t *testing.T) {
 	current := map[string]FileStat{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 200, Size: 50},
+		"a.txt": {Path: "a.txt", Mtime: 200, Size: 50},
 	}
 	state := map[string]*StateEntry{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50},
 	}
 
 	candidates, deleted := DetectChanges(current, state)
@@ -58,10 +121,10 @@ func TestDetectChanges_ModifiedFile(t *testing.T) {
 
 func TestDetectChanges_ModifiedFileSize(t *testing.T) {
 	current := map[string]FileStat{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 999},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 999},
 	}
 	state := map[string]*StateEntry{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50},
 	}
 
 	candidates, _ := DetectChanges(current, state)
@@ -78,10 +141,10 @@ func TestDetectChanges_UnchangedAndSent(t *testing.T) {
 	sentAt := int64(300)
 	hash := "abc123"
 	current := map[string]FileStat{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50},
 	}
 	state := map[string]*StateEntry{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50, Blake3: &hash, SentAt: &sentAt},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50, Blake3: &hash, SentAt: &sentAt},
 	}
 
 	candidates, deleted := DetectChanges(current, state)
@@ -97,10 +160,10 @@ func TestDetectChanges_UnchangedAndSent(t *testing.T) {
 func TestDetectChanges_PendingRetry(t *testing.T) {
 	hash := "abc123"
 	current := map[string]FileStat{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50},
 	}
 	state := map[string]*StateEntry{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50, Blake3: &hash, SentAt: nil},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50, Blake3: &hash, SentAt: nil},
 	}
 
 	candidates, deleted := DetectChanges(current, state)
@@ -121,10 +184,10 @@ func TestDetectChanges_PendingRetry(t *testing.T) {
 
 func TestDetectChanges_PendingRetryNilBlake3(t *testing.T) {
 	current := map[string]FileStat{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50},
 	}
 	state := map[string]*StateEntry{
-		"/tmp/a.txt": {Path: "/tmp/a.txt", Mtime: 100, Size: 50, Blake3: nil, SentAt: nil},
+		"a.txt": {Path: "a.txt", Mtime: 100, Size: 50, Blake3: nil, SentAt: nil},
 	}
 
 	candidates, _ := DetectChanges(current, state)
@@ -143,7 +206,7 @@ func TestDetectChanges_PendingRetryNilBlake3(t *testing.T) {
 func TestDetectChanges_DeletedFile(t *testing.T) {
 	current := map[string]FileStat{}
 	state := map[string]*StateEntry{
-		"/tmp/gone.txt": {Path: "/tmp/gone.txt", Mtime: 100, Size: 50},
+		"gone.txt": {Path: "gone.txt", Mtime: 100, Size: 50},
 	}
 
 	candidates, deleted := DetectChanges(current, state)
@@ -154,8 +217,8 @@ func TestDetectChanges_DeletedFile(t *testing.T) {
 	if len(deleted) != 1 {
 		t.Fatalf("expected 1 deleted, got %d", len(deleted))
 	}
-	if deleted[0] != "/tmp/gone.txt" {
-		t.Errorf("expected /tmp/gone.txt in deleted, got %s", deleted[0])
+	if deleted[0] != "gone.txt" {
+		t.Errorf("expected gone.txt in deleted, got %s", deleted[0])
 	}
 }
 
@@ -165,16 +228,16 @@ func TestDetectChanges_MixedScenarios(t *testing.T) {
 	retryHash := "retryhash"
 
 	current := map[string]FileStat{
-		"/tmp/new.txt":       {Path: "/tmp/new.txt", Mtime: 100, Size: 10},
-		"/tmp/modified.txt":  {Path: "/tmp/modified.txt", Mtime: 200, Size: 20},
-		"/tmp/unchanged.txt": {Path: "/tmp/unchanged.txt", Mtime: 100, Size: 50},
-		"/tmp/retry.txt":     {Path: "/tmp/retry.txt", Mtime: 100, Size: 30},
+		"new.txt":       {Path: "new.txt", Mtime: 100, Size: 10},
+		"modified.txt":  {Path: "modified.txt", Mtime: 200, Size: 20},
+		"unchanged.txt": {Path: "unchanged.txt", Mtime: 100, Size: 50},
+		"retry.txt":     {Path: "retry.txt", Mtime: 100, Size: 30},
 	}
 	state := map[string]*StateEntry{
-		"/tmp/modified.txt":  {Path: "/tmp/modified.txt", Mtime: 100, Size: 20, Blake3: &hash},
-		"/tmp/unchanged.txt": {Path: "/tmp/unchanged.txt", Mtime: 100, Size: 50, Blake3: &hash, SentAt: &sentAt},
-		"/tmp/retry.txt":     {Path: "/tmp/retry.txt", Mtime: 100, Size: 30, Blake3: &retryHash, SentAt: nil},
-		"/tmp/deleted.txt":   {Path: "/tmp/deleted.txt", Mtime: 100, Size: 40},
+		"modified.txt":  {Path: "modified.txt", Mtime: 100, Size: 20, Blake3: &hash},
+		"unchanged.txt": {Path: "unchanged.txt", Mtime: 100, Size: 50, Blake3: &hash, SentAt: &sentAt},
+		"retry.txt":     {Path: "retry.txt", Mtime: 100, Size: 30, Blake3: &retryHash, SentAt: nil},
+		"deleted.txt":   {Path: "deleted.txt", Mtime: 100, Size: 40},
 	}
 
 	candidates, deleted := DetectChanges(current, state)
@@ -199,8 +262,8 @@ func TestDetectChanges_MixedScenarios(t *testing.T) {
 	}
 
 	sort.Strings(deleted)
-	if len(deleted) != 1 || deleted[0] != "/tmp/deleted.txt" {
-		t.Errorf("expected deleted=[/tmp/deleted.txt], got %v", deleted)
+	if len(deleted) != 1 || deleted[0] != "deleted.txt" {
+		t.Errorf("expected deleted=[deleted.txt], got %v", deleted)
 	}
 }
 

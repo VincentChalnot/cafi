@@ -79,7 +79,8 @@ func main() {
 					if f.MimeType != nil {
 						mime = *f.MimeType
 					}
-					fmt.Printf("  %-45s %-25s %s\n", f.Path, mime, humanSize(f.Size))
+					fullPath := f.Folder + f.Filename
+					fmt.Printf("  %-45s %-25s %s\n", fullPath, mime, humanSize(f.Size))
 				}
 				fmt.Println()
 			}

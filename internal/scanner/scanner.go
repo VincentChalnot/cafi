@@ -47,6 +47,7 @@ type ScanResult struct {
 }
 
 // WalkDirectory performs Step 1: recursive stat pass.
+// Returns a map of relative file paths to their FileStat.
 func WalkDirectory(root string) (map[string]FileStat, error) {
 	files := make(map[string]FileStat)
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -59,12 +60,12 @@ func WalkDirectory(root string) (map[string]FileStat, error) {
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-		absPath, err := filepath.Abs(path)
+		relPath, err := filepath.Rel(root, path)
 		if err != nil {
 			return nil
 		}
-		files[absPath] = FileStat{
-			Path:  absPath,
+		files[relPath] = FileStat{
+			Path:  relPath,
 			Mtime: info.ModTime().Unix(),
 			Size:  info.Size(),
 		}
@@ -159,19 +160,21 @@ func DetectMIME(path string) (string, error) {
 }
 
 // ProcessCandidates performs Steps 3-4: compute BLAKE3 and detect MIME for candidates.
-func ProcessCandidates(candidates []Candidate) error {
+// root is the base directory to use for opening the files.
+func ProcessCandidates(root string, candidates []Candidate) error {
 	for i := range candidates {
 		c := &candidates[i]
+		absPath := filepath.Join(root, c.Path)
 		// Step 3: BLAKE3 computation (skip for pending retries)
 		if c.Type != CandidatePendingRetry {
-			hash, err := ComputeBLAKE3(c.Path)
+			hash, err := ComputeBLAKE3(absPath)
 			if err != nil {
 				return err
 			}
 			c.Blake3 = hash
 		}
 		// Step 4: MIME detection
-		mime, err := DetectMIME(c.Path)
+		mime, err := DetectMIME(absPath)
 		if err != nil {
 			return err
 		}
