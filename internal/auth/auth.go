@@ -15,13 +15,14 @@ import (
 
 type contextKey string
 
-const sourceIDKey contextKey = "source_id"
+const userIDKey contextKey = "user_id"
+const sourceMapKey contextKey = "source_map"
 
 // Interceptor provides gRPC stream authentication via bearer tokens.
 type Interceptor struct {
 	db     *db.DB
 	mu     sync.RWMutex
-	tokens []db.SourceToken
+	tokens []db.TokenInfo
 }
 
 // NewInterceptor creates a new auth interceptor.
@@ -29,9 +30,9 @@ func NewInterceptor(database *db.DB) *Interceptor {
 	return &Interceptor{db: database}
 }
 
-// LoadTokens fetches all source tokens from the database into memory.
+// LoadTokens fetches all non-expired tokens from the database into memory.
 func (a *Interceptor) LoadTokens(ctx context.Context) error {
-	tokens, err := a.db.GetAllSourceTokens(ctx)
+	tokens, err := a.db.GetAllTokens(ctx)
 	if err != nil {
 		return err
 	}
@@ -44,43 +45,56 @@ func (a *Interceptor) LoadTokens(ctx context.Context) error {
 // StreamInterceptor returns a gRPC stream server interceptor that validates bearer tokens.
 func (a *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		sourceID, err := a.authenticate(ss.Context())
+		userID, sourceIDs, err := a.authenticate(ss.Context())
 		if err != nil {
 			return err
 		}
-		wrapped := &wrappedStream{ServerStream: ss, ctx: context.WithValue(ss.Context(), sourceIDKey, sourceID)}
+		// Resolve source codes to IDs
+		sourceMap, err := a.db.GetSourceCodeToID(ss.Context(), sourceIDs)
+		if err != nil {
+			return status.Error(codes.Internal, "failed to resolve source codes")
+		}
+		ctx := context.WithValue(ss.Context(), userIDKey, userID)
+		ctx = context.WithValue(ctx, sourceMapKey, sourceMap)
+		wrapped := &wrappedStream{ServerStream: ss, ctx: ctx}
 		return handler(srv, wrapped)
 	}
 }
 
-func (a *Interceptor) authenticate(ctx context.Context) (string, error) {
+func (a *Interceptor) authenticate(ctx context.Context) (int, []int, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return "", status.Error(codes.Unauthenticated, "missing metadata")
+		return 0, nil, status.Error(codes.Unauthenticated, "missing metadata")
 	}
 	authHeader := md.Get("authorization")
 	if len(authHeader) == 0 {
-		return "", status.Error(codes.Unauthenticated, "missing authorization header")
+		return 0, nil, status.Error(codes.Unauthenticated, "missing authorization header")
 	}
 	token := strings.TrimPrefix(authHeader[0], "Bearer ")
 	if token == authHeader[0] {
-		return "", status.Error(codes.Unauthenticated, "invalid authorization format")
+		return 0, nil, status.Error(codes.Unauthenticated, "invalid authorization format")
 	}
 
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-	for _, st := range a.tokens {
-		if err := bcrypt.CompareHashAndPassword([]byte(st.TokenHash), []byte(token)); err == nil {
-			return st.SourceID, nil
+	for _, ti := range a.tokens {
+		if err := bcrypt.CompareHashAndPassword([]byte(ti.TokenHash), []byte(token)); err == nil {
+			return ti.UserID, ti.SourceIDs, nil
 		}
 	}
-	return "", status.Error(codes.Unauthenticated, "invalid token")
+	return 0, nil, status.Error(codes.Unauthenticated, "invalid token")
 }
 
-// SourceIDFromContext extracts the authenticated source ID from the context.
-func SourceIDFromContext(ctx context.Context) (string, bool) {
-	id, ok := ctx.Value(sourceIDKey).(string)
+// UserIDFromContext extracts the authenticated user ID from the context.
+func UserIDFromContext(ctx context.Context) (int, bool) {
+	id, ok := ctx.Value(userIDKey).(int)
 	return id, ok
+}
+
+// SourceMapFromContext extracts the source_code->source_id map from the context.
+func SourceMapFromContext(ctx context.Context) (map[string]int, bool) {
+	m, ok := ctx.Value(sourceMapKey).(map[string]int)
+	return m, ok
 }
 
 type wrappedStream struct {

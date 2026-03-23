@@ -67,18 +67,30 @@ func TestSyncFlow(t *testing.T) {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	// Create test user and source with a known bcrypt token hash
+	// Create test user, source, and token with a known bcrypt hash
 	const testToken = "tok_test_1234567890"
 	hash, err := bcrypt.GenerateFromPassword([]byte(testToken), bcrypt.MinCost)
 	if err != nil {
 		t.Fatalf("Failed to hash token: %v", err)
 	}
 
-	if err := database.UpsertUser(ctx, "test-user"); err != nil {
+	userID, err := database.CreateUser(ctx, "test-user")
+	if err != nil {
 		t.Fatalf("Failed to create user: %v", err)
 	}
-	if err := database.UpsertSource(ctx, "test-source", "test-user", string(hash)); err != nil {
+
+	sourceID, err := database.CreateSource(ctx, userID, "test-source", 0, nil)
+	if err != nil {
 		t.Fatalf("Failed to create source: %v", err)
+	}
+
+	tokenID, err := database.CreateToken(ctx, userID, "test-token", string(hash), "9999-12-31T23:59:59Z")
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	if err := database.AddTokenSources(ctx, tokenID, []int{sourceID}); err != nil {
+		t.Fatalf("Failed to add token sources: %v", err)
 	}
 
 	// Set up auth interceptor and load tokens
@@ -119,8 +131,8 @@ func TestSyncFlow(t *testing.T) {
 	err = stream.Send(&cafiv1.ClientMessage{
 		Message: &cafiv1.ClientMessage_Handshake{
 			Handshake: &cafiv1.Handshake{
-				ClientVersion: "test-v0.1",
-				SourceId:      "test-source",
+				ClientVersion: "test-v1.0",
+				SourceCode:    "test-source",
 			},
 		},
 	})
@@ -132,12 +144,13 @@ func TestSyncFlow(t *testing.T) {
 	err = stream.Send(&cafiv1.ClientMessage{
 		Message: &cafiv1.ClientMessage_FileEvent{
 			FileEvent: &cafiv1.FileEvent{
-				Blake3:    "abc123def456",
-				Path:      "/test/file.txt",
-				Mtime:     1700000000,
-				Size:      1024,
-				MimeType:  "text/plain",
-				EventType: cafiv1.EventType_EVENT_TYPE_UPSERT,
+				Blake3:     "abc123def456",
+				Path:       "/test/file.txt",
+				Mtime:      1700000000,
+				Size:       1024,
+				MimeType:   "text/plain",
+				EventType:  cafiv1.EventType_EVENT_TYPE_UPSERT,
+				SourceCode: "test-source",
 			},
 		},
 	})
@@ -162,8 +175,9 @@ func TestSyncFlow(t *testing.T) {
 	err = stream.Send(&cafiv1.ClientMessage{
 		Message: &cafiv1.ClientMessage_FileEvent{
 			FileEvent: &cafiv1.FileEvent{
-				Path:      "/test/file.txt",
-				EventType: cafiv1.EventType_EVENT_TYPE_DELETED,
+				Path:       "/test/file.txt",
+				EventType:  cafiv1.EventType_EVENT_TYPE_DELETED,
+				SourceCode: "test-source",
 			},
 		},
 	})
@@ -182,7 +196,7 @@ func TestSyncFlow(t *testing.T) {
 	}
 
 	// Verify database state: file should be soft-deleted, so QueryFilePaths returns empty
-	rows, err := database.QueryFilePaths(ctx, "test-source", "")
+	rows, err := database.QueryFilePaths(ctx, []int{sourceID}, "")
 	if err != nil {
 		t.Fatalf("Failed to query file paths: %v", err)
 	}

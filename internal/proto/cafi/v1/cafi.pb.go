@@ -75,7 +75,7 @@ func (EventType) EnumDescriptor() ([]byte, []int) {
 type Handshake struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ClientVersion string                 `protobuf:"bytes,1,opt,name=client_version,json=clientVersion,proto3" json:"client_version,omitempty"`
-	SourceId      string                 `protobuf:"bytes,2,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	SourceCode    string                 `protobuf:"bytes,2,opt,name=source_code,json=sourceCode,proto3" json:"source_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -117,9 +117,9 @@ func (x *Handshake) GetClientVersion() string {
 	return ""
 }
 
-func (x *Handshake) GetSourceId() string {
+func (x *Handshake) GetSourceCode() string {
 	if x != nil {
-		return x.SourceId
+		return x.SourceCode
 	}
 	return ""
 }
@@ -133,6 +133,7 @@ type FileEvent struct {
 	Size          int64                  `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
 	MimeType      string                 `protobuf:"bytes,5,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
 	EventType     EventType              `protobuf:"varint,6,opt,name=event_type,json=eventType,proto3,enum=cafi.v1.EventType" json:"event_type,omitempty"`
+	SourceCode    string                 `protobuf:"bytes,7,opt,name=source_code,json=sourceCode,proto3" json:"source_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -207,6 +208,13 @@ func (x *FileEvent) GetEventType() EventType {
 		return x.EventType
 	}
 	return EventType_EVENT_TYPE_UNSPECIFIED
+}
+
+func (x *FileEvent) GetSourceCode() string {
+	if x != nil {
+		return x.SourceCode
+	}
+	return ""
 }
 
 // ClientMessage is the envelope sent by the client on the Sync stream.
@@ -538,10 +546,11 @@ var File_cafi_v1_cafi_proto protoreflect.FileDescriptor
 
 const file_cafi_v1_cafi_proto_rawDesc = "" +
 	"\n" +
-	"\x12cafi/v1/cafi.proto\x12\acafi.v1\"O\n" +
+	"\x12cafi/v1/cafi.proto\x12\acafi.v1\"S\n" +
 	"\tHandshake\x12%\n" +
-	"\x0eclient_version\x18\x01 \x01(\tR\rclientVersion\x12\x1b\n" +
-	"\tsource_id\x18\x02 \x01(\tR\bsourceId\"\xb1\x01\n" +
+	"\x0eclient_version\x18\x01 \x01(\tR\rclientVersion\x12\x1f\n" +
+	"\vsource_code\x18\x02 \x01(\tR\n" +
+	"sourceCode\"\xd2\x01\n" +
 	"\tFileEvent\x12\x16\n" +
 	"\x06blake3\x18\x01 \x01(\tR\x06blake3\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x14\n" +
@@ -549,7 +558,9 @@ const file_cafi_v1_cafi_proto_rawDesc = "" +
 	"\x04size\x18\x04 \x01(\x03R\x04size\x12\x1b\n" +
 	"\tmime_type\x18\x05 \x01(\tR\bmimeType\x121\n" +
 	"\n" +
-	"event_type\x18\x06 \x01(\x0e2\x12.cafi.v1.EventTypeR\teventType\"\x83\x01\n" +
+	"event_type\x18\x06 \x01(\x0e2\x12.cafi.v1.EventTypeR\teventType\x12\x1f\n" +
+	"\vsource_code\x18\a \x01(\tR\n" +
+	"sourceCode\"\x83\x01\n" +
 	"\rClientMessage\x122\n" +
 	"\thandshake\x18\x01 \x01(\v2\x12.cafi.v1.HandshakeH\x00R\thandshake\x123\n" +
 	"\n" +

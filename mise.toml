@@ -14,7 +14,6 @@ description = "Build all binaries"
 run = """
 CGO_ENABLED=1 go build -o bin/cafi-client ./cmd/cafi-client/
 CGO_ENABLED=0 go build -o bin/cafi-server ./cmd/cafi-server/
-CGO_ENABLED=0 go build -o bin/cafi-search ./cmd/cafi-search/
 """
 
 [tasks.lint]
@@ -33,14 +32,4 @@ run = "docker build -t cafi-server ."
 description = "Run cafi-server"
 env.DATABASE_URL = "postgres://cafi:cafi@localhost:5434/cafi"
 run = "go run ./cmd/cafi-server serve"
-
-[tasks.run-client]
-description = "Run cafi-server"
-env.CAFI_TOKEN = "tok_live_6o0Qlmu5IBEAijsbhhNRhLtABojbxsST"
-run = "go run ./cmd/cafi-client scan ~/Pictures --source=pictures-vincent --reset-state"
-
-[tasks.run-search]
-description = "Run cafi-search"
-env.CAFI_DATABASE_URL = "postgres://cafi:cafi@localhost:5434/cafi"
-run = "go run ./cmd/cafi-search paths --filter='Screen*'"
 

@@ -14,7 +14,7 @@ enum EventType {
 // Handshake is the first message the client sends after opening a Sync stream.
 message Handshake {
   string client_version = 1;
-  string source_id = 2;
+  string source_code = 2;
 }
 
 // FileEvent describes a filesystem change on the client side.
@@ -25,6 +25,7 @@ message FileEvent {
   int64 size = 4;
   string mime_type = 5;
   EventType event_type = 6;
+  string source_code = 7;
 }
 
 // ClientMessage is the envelope sent by the client on the Sync stream.
