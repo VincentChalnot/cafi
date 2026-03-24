@@ -105,7 +105,7 @@ func TestSyncFlow(t *testing.T) {
 		t.Fatalf("Failed to listen: %v", err)
 	}
 	grpcServer := grpc.NewServer(grpc.StreamInterceptor(authInt.StreamInterceptor()))
-	cafiv1.RegisterIndexerServer(grpcServer, NewIndexerServer(database))
+	cafiv1.RegisterIndexerServer(grpcServer, NewIndexerServer(database, false))
 	go func() { _ = grpcServer.Serve(lis) }()
 	defer grpcServer.Stop()
 

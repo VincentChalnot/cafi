@@ -516,16 +516,20 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 		}
 
 		// Send handshake with first source
-		if err := stream.Send(&cafiv1.ClientMessage{
+		handshake := &cafiv1.ClientMessage{
 			Message: &cafiv1.ClientMessage_Handshake{
 				Handshake: &cafiv1.Handshake{
 					ClientVersion: "v1.0.0",
 					SourceCode:    sources[0].Code,
 				},
 			},
-		}); err != nil {
+		}
+		if err := stream.Send(handshake); err != nil {
 			conn.Close()
 			return fmt.Errorf("sending handshake: %w", err)
+		}
+		if verbose {
+			log.Printf("Sent: %v", handshake)
 		}
 
 		// Process all sources
@@ -542,6 +546,9 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 				if err != nil {
 					recvDone <- err
 					return
+				}
+				if verbose {
+					log.Printf("Received: %v", resp)
 				}
 				switch msg := resp.Message.(type) {
 				case *cafiv1.ServerMessage_EventAck:
@@ -570,19 +577,10 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 		for _, src := range sources {
 			fmt.Printf("\nScanning source %q (%s)...\n", src.Code, src.Path)
 
-			currentFiles, err := scanner.WalkDirectory(src.Path, verbose)
+			currentFiles, err := scanner.WalkDirectory(src.Code, src.Path, gitIgnore, verbose)
 			if err != nil {
 				log.Printf("Error walking %s: %v", src.Path, err)
 				continue
-			}
-
-			// Apply blocklist
-			if gitIgnore != nil {
-				for relPath := range currentFiles {
-					if gitIgnore.MatchesPath(relPath) {
-						delete(currentFiles, relPath)
-					}
-				}
 			}
 
 			totalFiles += len(currentFiles)
@@ -620,7 +618,7 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 				wg.Add(1)
 				go func() {
 					defer func() { <-sem; wg.Done() }()
-					if sendErr := stream.Send(&cafiv1.ClientMessage{
+					clientMsg := &cafiv1.ClientMessage{
 						Message: &cafiv1.ClientMessage_FileEvent{
 							FileEvent: &cafiv1.FileEvent{
 								Blake3:     c.Blake3,
@@ -632,9 +630,12 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 								SourceCode: src.Code,
 							},
 						},
-					}); sendErr != nil {
+					}
+					if sendErr := stream.Send(clientMsg); sendErr != nil {
 						sendErrs.Add(1)
 						log.Printf("Error sending event for %s: %v", c.Path, sendErr)
+					} else if verbose {
+						log.Printf("Sent: %v", clientMsg)
 					}
 				}()
 			}
@@ -644,7 +645,7 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 				wg.Add(1)
 				go func() {
 					defer func() { <-sem; wg.Done() }()
-					if sendErr := stream.Send(&cafiv1.ClientMessage{
+					clientMsg := &cafiv1.ClientMessage{
 						Message: &cafiv1.ClientMessage_FileEvent{
 							FileEvent: &cafiv1.FileEvent{
 								Path:       p,
@@ -652,9 +653,12 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 								SourceCode: src.Code,
 							},
 						},
-					}); sendErr != nil {
+					}
+					if sendErr := stream.Send(clientMsg); sendErr != nil {
 						sendErrs.Add(1)
 						log.Printf("Error sending delete for %s: %v", p, sendErr)
+					} else if verbose {
+						log.Printf("Sent: %v", clientMsg)
 					}
 				}()
 			}
@@ -699,19 +703,10 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 		for _, src := range sources {
 			fmt.Printf("\nScanning source %q (%s)...\n", src.Code, src.Path)
 
-			currentFiles, err := scanner.WalkDirectory(src.Path, verbose)
+			currentFiles, err := scanner.WalkDirectory(src.Code, src.Path, gitIgnore, verbose)
 			if err != nil {
 				log.Printf("Error walking %s: %v", src.Path, err)
 				continue
-			}
-
-			// Apply blocklist
-			if gitIgnore != nil {
-				for relPath := range currentFiles {
-					if gitIgnore.MatchesPath(relPath) {
-						delete(currentFiles, relPath)
-					}
-				}
 			}
 
 			fmt.Printf("  Found %d files\n", len(currentFiles))
@@ -728,11 +723,11 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 
 			fmt.Println("--- DRY RUN ---")
 			for _, c := range candidates {
-				fmt.Printf("  UPSERT [%s] %s (blake3=%s, mime=%s, size=%d)\n",
+				fmt.Printf("  UPSERT %s:/%s (blake3=%s, mime=%s, size=%d)\n",
 					src.Code, c.Path, c.Blake3, c.MimeType, c.Size)
 			}
 			for _, p := range deleted {
-				fmt.Printf("  DELETED [%s] %s\n", src.Code, p)
+				fmt.Printf("  DELETED %s:/%s\n", src.Code, p)
 			}
 		}
 		fmt.Printf("\nDuration: %.1fs\n", time.Since(start).Seconds())

@@ -16,12 +16,13 @@ import (
 // IndexerServer implements the Indexer gRPC service.
 type IndexerServer struct {
 	cafiv1.UnimplementedIndexerServer
-	DB *db.DB
+	DB      *db.DB
+	Verbose bool
 }
 
 // NewIndexerServer creates a new IndexerServer with the given database.
-func NewIndexerServer(database *db.DB) *IndexerServer {
-	return &IndexerServer{DB: database}
+func NewIndexerServer(database *db.DB, verbose bool) *IndexerServer {
+	return &IndexerServer{DB: database, Verbose: verbose}
 }
 
 // Sync handles the bidirectional streaming Sync RPC.
@@ -43,6 +44,9 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 	if err != nil {
 		return err
 	}
+	if s.Verbose {
+		log.Printf("Received: %v", firstMsg)
+	}
 	hs := firstMsg.GetHandshake()
 	if hs == nil {
 		return status.Error(codes.InvalidArgument, "first message must be a Handshake")
@@ -63,6 +67,10 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 		}
 		if err != nil {
 			return err
+		}
+
+		if s.Verbose {
+			log.Printf("Received: %v", msg)
 		}
 
 		fe := msg.GetFileEvent()
@@ -100,6 +108,9 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 				if sendErr != nil {
 					return sendErr
 				}
+				if s.Verbose {
+					log.Printf("Sent error for %s: %v", fe.GetPath(), err)
+				}
 				continue
 			}
 		case cafiv1.EventType_EVENT_TYPE_DELETED:
@@ -112,6 +123,9 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 				})
 				if sendErr != nil {
 					return sendErr
+				}
+				if s.Verbose {
+					log.Printf("Sent error for %s: %v", fe.GetPath(), err)
 				}
 				continue
 			}
@@ -128,15 +142,19 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 		}
 
 		// Send ACK
-		if err := stream.Send(&cafiv1.ServerMessage{
+		serverMsg := &cafiv1.ServerMessage{
 			Message: &cafiv1.ServerMessage_EventAck{
 				EventAck: &cafiv1.EventAck{
 					Blake3: fe.GetBlake3(),
 					Path:   fe.GetPath(),
 				},
 			},
-		}); err != nil {
+		}
+		if err := stream.Send(serverMsg); err != nil {
 			return err
+		}
+		if s.Verbose {
+			log.Printf("Sent: %v", serverMsg)
 		}
 	}
 }

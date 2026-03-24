@@ -58,7 +58,8 @@ func initDB(ctx context.Context) (*db.DB, *pgxpool.Pool, *config.Config, error) 
 }
 
 func serveCmd() *cobra.Command {
-	return &cobra.Command{
+	var verbose bool
+	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Run the gRPC server",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -81,7 +82,7 @@ func serveCmd() *cobra.Command {
 				grpc.StreamInterceptor(authInterceptor.StreamInterceptor()),
 				grpc.UnaryInterceptor(authInterceptor.UnaryInterceptor()),
 			)
-			cafiv1.RegisterIndexerServer(grpcServer, server.NewIndexerServer(database))
+			cafiv1.RegisterIndexerServer(grpcServer, server.NewIndexerServer(database, verbose))
 
 			lis, err := net.Listen("tcp", cfg.GRPCAddr)
 			if err != nil {
@@ -105,6 +106,8 @@ func serveCmd() *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
+	return cmd
 }
 
 func userCmd() *cobra.Command {

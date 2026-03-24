@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/zeebo/blake3"
 )
 
@@ -29,7 +30,7 @@ func TestWalkDirectory_RelativePaths(t *testing.T) {
 		}
 	}
 
-	found, err := WalkDirectory(tmpDir, false)
+	found, err := WalkDirectory("test", tmpDir, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,6 +42,57 @@ func TestWalkDirectory_RelativePaths(t *testing.T) {
 	for _, f := range files {
 		if _, ok := found[f]; !ok {
 			t.Errorf("expected to find %s in WalkDirectory results", f)
+		}
+	}
+}
+
+func TestWalkDirectory_Ignore(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	files := []string{
+		"a.txt",
+		".hidden/b.txt",
+		"sub/c.txt",
+		"sub/.ignored_file",
+		".dotfile",
+	}
+
+	for _, f := range files {
+		path := filepath.Join(tmpDir, f)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("hello"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	patterns := []string{
+		".*/",
+		".*",
+	}
+	gitIgnore := ignore.CompileIgnoreLines(patterns...)
+
+	found, err := WalkDirectory("test", tmpDir, gitIgnore, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := []string{"a.txt", "sub/c.txt"}
+	if len(found) != len(expected) {
+		t.Errorf("expected %d files, got %d: %v", len(expected), len(found), found)
+	}
+
+	for _, f := range expected {
+		if _, ok := found[f]; !ok {
+			t.Errorf("expected to find %s in WalkDirectory results", f)
+		}
+	}
+
+	ignored := []string{".hidden/b.txt", "sub/.ignored_file", ".dotfile"}
+	for _, f := range ignored {
+		if _, ok := found[f]; ok {
+			t.Errorf("did NOT expect to find %s in WalkDirectory results", f)
 		}
 	}
 }
