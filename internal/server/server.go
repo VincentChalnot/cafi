@@ -75,6 +75,19 @@ func (s *IndexerServer) Sync(stream cafiv1.Indexer_SyncServer) error {
 
 		fe := msg.GetFileEvent()
 		if fe == nil {
+			if msg.GetEndOfQueue() != nil {
+				// Strategy: remote will send pull requests here in the future.
+				// For now, just send STOP.
+				if s.Verbose {
+					log.Printf("Received EndOfQueue, sending Stop")
+				}
+				stopMsg := &cafiv1.ServerMessage{
+					Message: &cafiv1.ServerMessage_Stop{
+						Stop: &cafiv1.Stop{},
+					},
+				}
+				return stream.Send(stopMsg)
+			}
 			continue
 		}
 

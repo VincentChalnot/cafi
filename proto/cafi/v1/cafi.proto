@@ -33,8 +33,12 @@ message ClientMessage {
   oneof message {
     Handshake handshake = 1;
     FileEvent file_event = 2;
+    EndOfQueue end_of_queue = 3;
   }
 }
+
+// EndOfQueue is sent by the client to signal it has no more events for now.
+message EndOfQueue {}
 
 // EventAck confirms that an event was persisted on the server.
 message EventAck {
@@ -44,6 +48,9 @@ message EventAck {
 
 // PullRequest is reserved for v1 and is never emitted in v0.
 message PullRequest {}
+
+// Stop is sent by the server to signal the client it can close the connection.
+message Stop {}
 
 // SyncError reports an error to the client.
 message SyncError {
@@ -57,6 +64,7 @@ message ServerMessage {
     EventAck event_ack = 1;
     PullRequest pull_request = 2;
     SyncError sync_error = 3;
+    Stop stop = 4;
   }
 }
 

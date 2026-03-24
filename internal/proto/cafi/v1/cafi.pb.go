@@ -224,6 +224,7 @@ type ClientMessage struct {
 	//
 	//	*ClientMessage_Handshake
 	//	*ClientMessage_FileEvent
+	//	*ClientMessage_EndOfQueue
 	Message       isClientMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -284,6 +285,15 @@ func (x *ClientMessage) GetFileEvent() *FileEvent {
 	return nil
 }
 
+func (x *ClientMessage) GetEndOfQueue() *EndOfQueue {
+	if x != nil {
+		if x, ok := x.Message.(*ClientMessage_EndOfQueue); ok {
+			return x.EndOfQueue
+		}
+	}
+	return nil
+}
+
 type isClientMessage_Message interface {
 	isClientMessage_Message()
 }
@@ -296,9 +306,52 @@ type ClientMessage_FileEvent struct {
 	FileEvent *FileEvent `protobuf:"bytes,2,opt,name=file_event,json=fileEvent,proto3,oneof"`
 }
 
+type ClientMessage_EndOfQueue struct {
+	EndOfQueue *EndOfQueue `protobuf:"bytes,3,opt,name=end_of_queue,json=endOfQueue,proto3,oneof"`
+}
+
 func (*ClientMessage_Handshake) isClientMessage_Message() {}
 
 func (*ClientMessage_FileEvent) isClientMessage_Message() {}
+
+func (*ClientMessage_EndOfQueue) isClientMessage_Message() {}
+
+// EndOfQueue is sent by the client to signal it has no more events for now.
+type EndOfQueue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndOfQueue) Reset() {
+	*x = EndOfQueue{}
+	mi := &file_cafi_v1_cafi_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndOfQueue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndOfQueue) ProtoMessage() {}
+
+func (x *EndOfQueue) ProtoReflect() protoreflect.Message {
+	mi := &file_cafi_v1_cafi_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndOfQueue.ProtoReflect.Descriptor instead.
+func (*EndOfQueue) Descriptor() ([]byte, []int) {
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{3}
+}
 
 // EventAck confirms that an event was persisted on the server.
 type EventAck struct {
@@ -311,7 +364,7 @@ type EventAck struct {
 
 func (x *EventAck) Reset() {
 	*x = EventAck{}
-	mi := &file_cafi_v1_cafi_proto_msgTypes[3]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -323,7 +376,7 @@ func (x *EventAck) String() string {
 func (*EventAck) ProtoMessage() {}
 
 func (x *EventAck) ProtoReflect() protoreflect.Message {
-	mi := &file_cafi_v1_cafi_proto_msgTypes[3]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -336,7 +389,7 @@ func (x *EventAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventAck.ProtoReflect.Descriptor instead.
 func (*EventAck) Descriptor() ([]byte, []int) {
-	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{3}
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *EventAck) GetBlake3() string {
@@ -362,7 +415,7 @@ type PullRequest struct {
 
 func (x *PullRequest) Reset() {
 	*x = PullRequest{}
-	mi := &file_cafi_v1_cafi_proto_msgTypes[4]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -374,7 +427,7 @@ func (x *PullRequest) String() string {
 func (*PullRequest) ProtoMessage() {}
 
 func (x *PullRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cafi_v1_cafi_proto_msgTypes[4]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -387,7 +440,44 @@ func (x *PullRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequest.ProtoReflect.Descriptor instead.
 func (*PullRequest) Descriptor() ([]byte, []int) {
-	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{4}
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{5}
+}
+
+// Stop is sent by the server to signal the client it can close the connection.
+type Stop struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Stop) Reset() {
+	*x = Stop{}
+	mi := &file_cafi_v1_cafi_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Stop) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Stop) ProtoMessage() {}
+
+func (x *Stop) ProtoReflect() protoreflect.Message {
+	mi := &file_cafi_v1_cafi_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Stop.ProtoReflect.Descriptor instead.
+func (*Stop) Descriptor() ([]byte, []int) {
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{6}
 }
 
 // SyncError reports an error to the client.
@@ -401,7 +491,7 @@ type SyncError struct {
 
 func (x *SyncError) Reset() {
 	*x = SyncError{}
-	mi := &file_cafi_v1_cafi_proto_msgTypes[5]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -413,7 +503,7 @@ func (x *SyncError) String() string {
 func (*SyncError) ProtoMessage() {}
 
 func (x *SyncError) ProtoReflect() protoreflect.Message {
-	mi := &file_cafi_v1_cafi_proto_msgTypes[5]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -426,7 +516,7 @@ func (x *SyncError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncError.ProtoReflect.Descriptor instead.
 func (*SyncError) Descriptor() ([]byte, []int) {
-	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{5}
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SyncError) GetMessage() string {
@@ -451,6 +541,7 @@ type ServerMessage struct {
 	//	*ServerMessage_EventAck
 	//	*ServerMessage_PullRequest
 	//	*ServerMessage_SyncError
+	//	*ServerMessage_Stop
 	Message       isServerMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -458,7 +549,7 @@ type ServerMessage struct {
 
 func (x *ServerMessage) Reset() {
 	*x = ServerMessage{}
-	mi := &file_cafi_v1_cafi_proto_msgTypes[6]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -470,7 +561,7 @@ func (x *ServerMessage) String() string {
 func (*ServerMessage) ProtoMessage() {}
 
 func (x *ServerMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_cafi_v1_cafi_proto_msgTypes[6]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -483,7 +574,7 @@ func (x *ServerMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerMessage.ProtoReflect.Descriptor instead.
 func (*ServerMessage) Descriptor() ([]byte, []int) {
-	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{6}
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ServerMessage) GetMessage() isServerMessage_Message {
@@ -520,6 +611,15 @@ func (x *ServerMessage) GetSyncError() *SyncError {
 	return nil
 }
 
+func (x *ServerMessage) GetStop() *Stop {
+	if x != nil {
+		if x, ok := x.Message.(*ServerMessage_Stop); ok {
+			return x.Stop
+		}
+	}
+	return nil
+}
+
 type isServerMessage_Message interface {
 	isServerMessage_Message()
 }
@@ -536,11 +636,17 @@ type ServerMessage_SyncError struct {
 	SyncError *SyncError `protobuf:"bytes,3,opt,name=sync_error,json=syncError,proto3,oneof"`
 }
 
+type ServerMessage_Stop struct {
+	Stop *Stop `protobuf:"bytes,4,opt,name=stop,proto3,oneof"`
+}
+
 func (*ServerMessage_EventAck) isServerMessage_Message() {}
 
 func (*ServerMessage_PullRequest) isServerMessage_Message() {}
 
 func (*ServerMessage_SyncError) isServerMessage_Message() {}
+
+func (*ServerMessage_Stop) isServerMessage_Message() {}
 
 type PingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -550,7 +656,7 @@ type PingRequest struct {
 
 func (x *PingRequest) Reset() {
 	*x = PingRequest{}
-	mi := &file_cafi_v1_cafi_proto_msgTypes[7]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -562,7 +668,7 @@ func (x *PingRequest) String() string {
 func (*PingRequest) ProtoMessage() {}
 
 func (x *PingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cafi_v1_cafi_proto_msgTypes[7]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -575,7 +681,7 @@ func (x *PingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingRequest.ProtoReflect.Descriptor instead.
 func (*PingRequest) Descriptor() ([]byte, []int) {
-	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{7}
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{9}
 }
 
 type PingResponse struct {
@@ -586,7 +692,7 @@ type PingResponse struct {
 
 func (x *PingResponse) Reset() {
 	*x = PingResponse{}
-	mi := &file_cafi_v1_cafi_proto_msgTypes[8]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +704,7 @@ func (x *PingResponse) String() string {
 func (*PingResponse) ProtoMessage() {}
 
 func (x *PingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cafi_v1_cafi_proto_msgTypes[8]
+	mi := &file_cafi_v1_cafi_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +717,7 @@ func (x *PingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingResponse.ProtoReflect.Descriptor instead.
 func (*PingResponse) Descriptor() ([]byte, []int) {
-	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{8}
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{10}
 }
 
 var File_cafi_v1_cafi_proto protoreflect.FileDescriptor
@@ -632,24 +738,30 @@ const file_cafi_v1_cafi_proto_rawDesc = "" +
 	"\n" +
 	"event_type\x18\x06 \x01(\x0e2\x12.cafi.v1.EventTypeR\teventType\x12\x1f\n" +
 	"\vsource_code\x18\a \x01(\tR\n" +
-	"sourceCode\"\x83\x01\n" +
+	"sourceCode\"\xbc\x01\n" +
 	"\rClientMessage\x122\n" +
 	"\thandshake\x18\x01 \x01(\v2\x12.cafi.v1.HandshakeH\x00R\thandshake\x123\n" +
 	"\n" +
-	"file_event\x18\x02 \x01(\v2\x12.cafi.v1.FileEventH\x00R\tfileEventB\t\n" +
-	"\amessage\"6\n" +
+	"file_event\x18\x02 \x01(\v2\x12.cafi.v1.FileEventH\x00R\tfileEvent\x127\n" +
+	"\fend_of_queue\x18\x03 \x01(\v2\x13.cafi.v1.EndOfQueueH\x00R\n" +
+	"endOfQueueB\t\n" +
+	"\amessage\"\f\n" +
+	"\n" +
+	"EndOfQueue\"6\n" +
 	"\bEventAck\x12\x16\n" +
 	"\x06blake3\x18\x01 \x01(\tR\x06blake3\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\"\r\n" +
-	"\vPullRequest\";\n" +
+	"\vPullRequest\"\x06\n" +
+	"\x04Stop\";\n" +
 	"\tSyncError\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x14\n" +
-	"\x05fatal\x18\x02 \x01(\bR\x05fatal\"\xbc\x01\n" +
+	"\x05fatal\x18\x02 \x01(\bR\x05fatal\"\xe1\x01\n" +
 	"\rServerMessage\x120\n" +
 	"\tevent_ack\x18\x01 \x01(\v2\x11.cafi.v1.EventAckH\x00R\beventAck\x129\n" +
 	"\fpull_request\x18\x02 \x01(\v2\x14.cafi.v1.PullRequestH\x00R\vpullRequest\x123\n" +
 	"\n" +
-	"sync_error\x18\x03 \x01(\v2\x12.cafi.v1.SyncErrorH\x00R\tsyncErrorB\t\n" +
+	"sync_error\x18\x03 \x01(\v2\x12.cafi.v1.SyncErrorH\x00R\tsyncError\x12#\n" +
+	"\x04stop\x18\x04 \x01(\v2\r.cafi.v1.StopH\x00R\x04stopB\t\n" +
 	"\amessage\"\r\n" +
 	"\vPingRequest\"\x0e\n" +
 	"\fPingResponse*V\n" +
@@ -674,35 +786,39 @@ func file_cafi_v1_cafi_proto_rawDescGZIP() []byte {
 }
 
 var file_cafi_v1_cafi_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_cafi_v1_cafi_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_cafi_v1_cafi_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_cafi_v1_cafi_proto_goTypes = []any{
 	(EventType)(0),        // 0: cafi.v1.EventType
 	(*Handshake)(nil),     // 1: cafi.v1.Handshake
 	(*FileEvent)(nil),     // 2: cafi.v1.FileEvent
 	(*ClientMessage)(nil), // 3: cafi.v1.ClientMessage
-	(*EventAck)(nil),      // 4: cafi.v1.EventAck
-	(*PullRequest)(nil),   // 5: cafi.v1.PullRequest
-	(*SyncError)(nil),     // 6: cafi.v1.SyncError
-	(*ServerMessage)(nil), // 7: cafi.v1.ServerMessage
-	(*PingRequest)(nil),   // 8: cafi.v1.PingRequest
-	(*PingResponse)(nil),  // 9: cafi.v1.PingResponse
+	(*EndOfQueue)(nil),    // 4: cafi.v1.EndOfQueue
+	(*EventAck)(nil),      // 5: cafi.v1.EventAck
+	(*PullRequest)(nil),   // 6: cafi.v1.PullRequest
+	(*Stop)(nil),          // 7: cafi.v1.Stop
+	(*SyncError)(nil),     // 8: cafi.v1.SyncError
+	(*ServerMessage)(nil), // 9: cafi.v1.ServerMessage
+	(*PingRequest)(nil),   // 10: cafi.v1.PingRequest
+	(*PingResponse)(nil),  // 11: cafi.v1.PingResponse
 }
 var file_cafi_v1_cafi_proto_depIdxs = []int32{
-	0, // 0: cafi.v1.FileEvent.event_type:type_name -> cafi.v1.EventType
-	1, // 1: cafi.v1.ClientMessage.handshake:type_name -> cafi.v1.Handshake
-	2, // 2: cafi.v1.ClientMessage.file_event:type_name -> cafi.v1.FileEvent
-	4, // 3: cafi.v1.ServerMessage.event_ack:type_name -> cafi.v1.EventAck
-	5, // 4: cafi.v1.ServerMessage.pull_request:type_name -> cafi.v1.PullRequest
-	6, // 5: cafi.v1.ServerMessage.sync_error:type_name -> cafi.v1.SyncError
-	3, // 6: cafi.v1.Indexer.Sync:input_type -> cafi.v1.ClientMessage
-	8, // 7: cafi.v1.Indexer.Ping:input_type -> cafi.v1.PingRequest
-	7, // 8: cafi.v1.Indexer.Sync:output_type -> cafi.v1.ServerMessage
-	9, // 9: cafi.v1.Indexer.Ping:output_type -> cafi.v1.PingResponse
-	8, // [8:10] is the sub-list for method output_type
-	6, // [6:8] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	0,  // 0: cafi.v1.FileEvent.event_type:type_name -> cafi.v1.EventType
+	1,  // 1: cafi.v1.ClientMessage.handshake:type_name -> cafi.v1.Handshake
+	2,  // 2: cafi.v1.ClientMessage.file_event:type_name -> cafi.v1.FileEvent
+	4,  // 3: cafi.v1.ClientMessage.end_of_queue:type_name -> cafi.v1.EndOfQueue
+	5,  // 4: cafi.v1.ServerMessage.event_ack:type_name -> cafi.v1.EventAck
+	6,  // 5: cafi.v1.ServerMessage.pull_request:type_name -> cafi.v1.PullRequest
+	8,  // 6: cafi.v1.ServerMessage.sync_error:type_name -> cafi.v1.SyncError
+	7,  // 7: cafi.v1.ServerMessage.stop:type_name -> cafi.v1.Stop
+	3,  // 8: cafi.v1.Indexer.Sync:input_type -> cafi.v1.ClientMessage
+	10, // 9: cafi.v1.Indexer.Ping:input_type -> cafi.v1.PingRequest
+	9,  // 10: cafi.v1.Indexer.Sync:output_type -> cafi.v1.ServerMessage
+	11, // 11: cafi.v1.Indexer.Ping:output_type -> cafi.v1.PingResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_cafi_v1_cafi_proto_init() }
@@ -713,11 +829,13 @@ func file_cafi_v1_cafi_proto_init() {
 	file_cafi_v1_cafi_proto_msgTypes[2].OneofWrappers = []any{
 		(*ClientMessage_Handshake)(nil),
 		(*ClientMessage_FileEvent)(nil),
+		(*ClientMessage_EndOfQueue)(nil),
 	}
-	file_cafi_v1_cafi_proto_msgTypes[6].OneofWrappers = []any{
+	file_cafi_v1_cafi_proto_msgTypes[8].OneofWrappers = []any{
 		(*ServerMessage_EventAck)(nil),
 		(*ServerMessage_PullRequest)(nil),
 		(*ServerMessage_SyncError)(nil),
+		(*ServerMessage_Stop)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -725,7 +843,7 @@ func file_cafi_v1_cafi_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cafi_v1_cafi_proto_rawDesc), len(file_cafi_v1_cafi_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

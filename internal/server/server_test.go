@@ -204,6 +204,25 @@ func TestSyncFlow(t *testing.T) {
 		t.Fatalf("Expected 0 active file paths, got %d", len(rows))
 	}
 
+	// Send EndOfQueue
+	err = stream.Send(&cafiv1.ClientMessage{
+		Message: &cafiv1.ClientMessage_EndOfQueue{
+			EndOfQueue: &cafiv1.EndOfQueue{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to send EndOfQueue: %v", err)
+	}
+
+	// Receive Stop
+	resp, err = stream.Recv()
+	if err != nil {
+		t.Fatalf("Failed to receive Stop: %v", err)
+	}
+	if resp.GetStop() == nil {
+		t.Fatalf("Expected Stop message, got: %v", resp)
+	}
+
 	// Close stream
 	_ = stream.CloseSend()
 }

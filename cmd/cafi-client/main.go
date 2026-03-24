@@ -567,6 +567,12 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 						return
 					}
 					log.Printf("Server error (non-fatal): %s", msg.SyncError.GetMessage())
+				case *cafiv1.ServerMessage_Stop:
+					if verbose {
+						log.Printf("Received Stop from server")
+					}
+					recvDone <- nil
+					return
 				}
 			}
 		}()
@@ -673,6 +679,19 @@ func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 				}
 				mu.Unlock()
 			}
+		}
+
+		// All sources processed, send EndOfQueue
+		endOfQueue := &cafiv1.ClientMessage{
+			Message: &cafiv1.ClientMessage_EndOfQueue{
+				EndOfQueue: &cafiv1.EndOfQueue{},
+			},
+		}
+		if err := stream.Send(endOfQueue); err != nil {
+			return fmt.Errorf("sending end of queue: %w", err)
+		}
+		if verbose {
+			log.Printf("Sent: %v", endOfQueue)
 		}
 
 		if err := stream.CloseSend(); err != nil {
