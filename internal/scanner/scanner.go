@@ -48,9 +48,12 @@ type ScanResult struct {
 
 // WalkDirectory performs Step 1: recursive stat pass.
 // Returns a map of relative file paths to their FileStat.
-func WalkDirectory(root string) (map[string]FileStat, error) {
+func WalkDirectory(root string, verbose bool) (map[string]FileStat, error) {
 	files := make(map[string]FileStat)
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if verbose {
+			fmt.Println(path)
+		}
 		if err != nil {
 			return nil // skip files we can't stat
 		}

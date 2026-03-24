@@ -542,6 +542,78 @@ func (*ServerMessage_PullRequest) isServerMessage_Message() {}
 
 func (*ServerMessage_SyncError) isServerMessage_Message() {}
 
+type PingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PingRequest) Reset() {
+	*x = PingRequest{}
+	mi := &file_cafi_v1_cafi_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PingRequest) ProtoMessage() {}
+
+func (x *PingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_cafi_v1_cafi_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PingRequest.ProtoReflect.Descriptor instead.
+func (*PingRequest) Descriptor() ([]byte, []int) {
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{7}
+}
+
+type PingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PingResponse) Reset() {
+	*x = PingResponse{}
+	mi := &file_cafi_v1_cafi_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PingResponse) ProtoMessage() {}
+
+func (x *PingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_cafi_v1_cafi_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PingResponse.ProtoReflect.Descriptor instead.
+func (*PingResponse) Descriptor() ([]byte, []int) {
+	return file_cafi_v1_cafi_proto_rawDescGZIP(), []int{8}
+}
+
 var File_cafi_v1_cafi_proto protoreflect.FileDescriptor
 
 const file_cafi_v1_cafi_proto_rawDesc = "" +
@@ -578,13 +650,16 @@ const file_cafi_v1_cafi_proto_rawDesc = "" +
 	"\fpull_request\x18\x02 \x01(\v2\x14.cafi.v1.PullRequestH\x00R\vpullRequest\x123\n" +
 	"\n" +
 	"sync_error\x18\x03 \x01(\v2\x12.cafi.v1.SyncErrorH\x00R\tsyncErrorB\t\n" +
-	"\amessage*V\n" +
+	"\amessage\"\r\n" +
+	"\vPingRequest\"\x0e\n" +
+	"\fPingResponse*V\n" +
 	"\tEventType\x12\x1a\n" +
 	"\x16EVENT_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11EVENT_TYPE_UPSERT\x10\x01\x12\x16\n" +
-	"\x12EVENT_TYPE_DELETED\x10\x022G\n" +
+	"\x12EVENT_TYPE_DELETED\x10\x022~\n" +
 	"\aIndexer\x12<\n" +
-	"\x04Sync\x12\x16.cafi.v1.ClientMessage\x1a\x16.cafi.v1.ServerMessage\"\x00(\x010\x01B>Z<github.com/VincentChalnot/cafi/internal/proto/cafi/v1;cafiv1b\x06proto3"
+	"\x04Sync\x12\x16.cafi.v1.ClientMessage\x1a\x16.cafi.v1.ServerMessage\"\x00(\x010\x01\x125\n" +
+	"\x04Ping\x12\x14.cafi.v1.PingRequest\x1a\x15.cafi.v1.PingResponse\"\x00B>Z<github.com/VincentChalnot/cafi/internal/proto/cafi/v1;cafiv1b\x06proto3"
 
 var (
 	file_cafi_v1_cafi_proto_rawDescOnce sync.Once
@@ -599,7 +674,7 @@ func file_cafi_v1_cafi_proto_rawDescGZIP() []byte {
 }
 
 var file_cafi_v1_cafi_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_cafi_v1_cafi_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_cafi_v1_cafi_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_cafi_v1_cafi_proto_goTypes = []any{
 	(EventType)(0),        // 0: cafi.v1.EventType
 	(*Handshake)(nil),     // 1: cafi.v1.Handshake
@@ -609,6 +684,8 @@ var file_cafi_v1_cafi_proto_goTypes = []any{
 	(*PullRequest)(nil),   // 5: cafi.v1.PullRequest
 	(*SyncError)(nil),     // 6: cafi.v1.SyncError
 	(*ServerMessage)(nil), // 7: cafi.v1.ServerMessage
+	(*PingRequest)(nil),   // 8: cafi.v1.PingRequest
+	(*PingResponse)(nil),  // 9: cafi.v1.PingResponse
 }
 var file_cafi_v1_cafi_proto_depIdxs = []int32{
 	0, // 0: cafi.v1.FileEvent.event_type:type_name -> cafi.v1.EventType
@@ -618,9 +695,11 @@ var file_cafi_v1_cafi_proto_depIdxs = []int32{
 	5, // 4: cafi.v1.ServerMessage.pull_request:type_name -> cafi.v1.PullRequest
 	6, // 5: cafi.v1.ServerMessage.sync_error:type_name -> cafi.v1.SyncError
 	3, // 6: cafi.v1.Indexer.Sync:input_type -> cafi.v1.ClientMessage
-	7, // 7: cafi.v1.Indexer.Sync:output_type -> cafi.v1.ServerMessage
-	7, // [7:8] is the sub-list for method output_type
-	6, // [6:7] is the sub-list for method input_type
+	8, // 7: cafi.v1.Indexer.Ping:input_type -> cafi.v1.PingRequest
+	7, // 8: cafi.v1.Indexer.Sync:output_type -> cafi.v1.ServerMessage
+	9, // 9: cafi.v1.Indexer.Ping:output_type -> cafi.v1.PingResponse
+	8, // [8:10] is the sub-list for method output_type
+	6, // [6:8] is the sub-list for method input_type
 	6, // [6:6] is the sub-list for extension type_name
 	6, // [6:6] is the sub-list for extension extendee
 	0, // [0:6] is the sub-list for field type_name
@@ -646,7 +725,7 @@ func file_cafi_v1_cafi_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cafi_v1_cafi_proto_rawDesc), len(file_cafi_v1_cafi_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

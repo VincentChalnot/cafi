@@ -29,7 +29,7 @@ func TestWalkDirectory_RelativePaths(t *testing.T) {
 		}
 	}
 
-	found, err := WalkDirectory(tmpDir)
+	found, err := WalkDirectory(tmpDir, false)
 	if err != nil {
 		t.Fatal(err)
 	}

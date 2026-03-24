@@ -163,3 +163,12 @@ func (s *IndexerServer) handleDelete(ctx context.Context, sourceID int, fe *cafi
 	folder, filename := path.Split(fe.GetPath())
 	return s.DB.MarkFileDeleted(ctx, sourceID, folder, filename)
 }
+
+// Ping verifies connectivity and authentication.
+func (s *IndexerServer) Ping(ctx context.Context, _ *cafiv1.PingRequest) (*cafiv1.PingResponse, error) {
+	if _, ok := auth.UserIDFromContext(ctx); !ok {
+		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
+	}
+	// No payload needed, returning empty response indicates success
+	return &cafiv1.PingResponse{}, nil
+}

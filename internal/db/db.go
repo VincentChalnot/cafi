@@ -132,6 +132,7 @@ func (d *DB) GetSourceID(ctx context.Context, userID int, code string) (int, err
 type SourceInfo struct {
 	ID       int
 	UserID   int
+	Username string
 	Code     string
 	Strategy int
 	Path     *string
@@ -139,7 +140,11 @@ type SourceInfo struct {
 
 // ListSources returns all sources.
 func (d *DB) ListSources(ctx context.Context) ([]SourceInfo, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT id, user_id, code, strategy, path FROM sources ORDER BY id`)
+	rows, err := d.Pool.Query(ctx,
+		`SELECT s.id, s.user_id, u.username, s.code, s.strategy, s.path
+		 FROM sources s
+		 JOIN users u ON s.user_id = u.id
+		 ORDER BY s.id`)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +153,7 @@ func (d *DB) ListSources(ctx context.Context) ([]SourceInfo, error) {
 	var sources []SourceInfo
 	for rows.Next() {
 		var s SourceInfo
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Code, &s.Strategy, &s.Path); err != nil {
+		if err := rows.Scan(&s.ID, &s.UserID, &s.Username, &s.Code, &s.Strategy, &s.Path); err != nil {
 			return nil, err
 		}
 		sources = append(sources, s)
@@ -238,18 +243,21 @@ func (d *DB) RemoveTokenSources(ctx context.Context, tokenID int, sourceIDs []in
 
 // TokenInfo holds the token hash, user_id, and linked source IDs for auth.
 type TokenInfo struct {
-	TokenID   int
+	ID        int
 	UserID    int
+	Username  string
+	Name      string
 	TokenHash string
+	ExpireAt  string
 	SourceIDs []int
 }
 
-// GetAllTokens retrieves all non-expired tokens with their source IDs.
+// GetAllTokens retrieves all tokens.
 func (d *DB) GetAllTokens(ctx context.Context) ([]TokenInfo, error) {
 	rows, err := d.Pool.Query(ctx,
-		`SELECT t.id, t.user_id, t.token_hash
+		`SELECT t.id, t.user_id, u.username, t.name, t.token_hash, t.expire_at
 		 FROM tokens t
-		 WHERE t.expire_at > now()`)
+		 JOIN users u ON t.user_id = u.id`)
 	if err != nil {
 		return nil, err
 	}
@@ -258,9 +266,11 @@ func (d *DB) GetAllTokens(ctx context.Context) ([]TokenInfo, error) {
 	var tokens []TokenInfo
 	for rows.Next() {
 		var ti TokenInfo
-		if err := rows.Scan(&ti.TokenID, &ti.UserID, &ti.TokenHash); err != nil {
+		var expireAt any
+		if err := rows.Scan(&ti.ID, &ti.UserID, &ti.Username, &ti.Name, &ti.TokenHash, &expireAt); err != nil {
 			return nil, err
 		}
+		ti.ExpireAt = fmt.Sprintf("%v", expireAt)
 		tokens = append(tokens, ti)
 	}
 	if err := rows.Err(); err != nil {
@@ -270,7 +280,7 @@ func (d *DB) GetAllTokens(ctx context.Context) ([]TokenInfo, error) {
 	// Load source_ids for each token
 	for i := range tokens {
 		srcRows, err := d.Pool.Query(ctx,
-			`SELECT source_id FROM token_sources WHERE token_id = $1`, tokens[i].TokenID)
+			`SELECT source_id FROM token_sources WHERE token_id = $1`, tokens[i].ID)
 		if err != nil {
 			return nil, err
 		}

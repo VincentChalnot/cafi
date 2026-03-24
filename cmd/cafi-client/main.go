@@ -133,9 +133,10 @@ func connectCmd() *cobra.Command {
 	var noRemoteCheck bool
 
 	cmd := &cobra.Command{
-		Use:   "connect <server>",
-		Short: "Configure the server connection",
-		Args:  cobra.ExactArgs(1),
+		Use:     "connect <server>",
+		Aliases: []string{"add", "new"},
+		Short:   "Configure the server connection",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openClientDB()
 			if err != nil {
@@ -171,8 +172,18 @@ func connectCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("failed to connect to server: %w", err)
 				}
-				conn.Close()
-				fmt.Println("Connection verified.")
+				defer conn.Close()
+
+				client := cafiv1.NewIndexerClient(conn)
+				// Attach token in Authorization metadata and call Ping
+				md := metadata.Pairs("authorization", "Bearer "+token)
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				ctx = metadata.NewOutgoingContext(ctx, md)
+				if _, err := client.Ping(ctx, &cafiv1.PingRequest{}); err != nil {
+					return fmt.Errorf("server ping failed: %w", err)
+				}
+				fmt.Println("Connection and token verified.")
 			}
 
 			if err := setConfig(db, "server", args[0]); err != nil {
@@ -198,6 +209,7 @@ func sourceCmd() *cobra.Command {
 
 	sourceCmd.AddCommand(sourceAddCmd())
 	sourceCmd.AddCommand(sourceRemoveCmd())
+	sourceCmd.AddCommand(sourceListCmd())
 	sourceCmd.AddCommand(sourceRefreshTokenCmd())
 	sourceCmd.AddCommand(sourceUpdatePathCmd())
 
@@ -206,9 +218,10 @@ func sourceCmd() *cobra.Command {
 
 func sourceAddCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "add <source_code> <localpath>",
-		Short: "Add a local source",
-		Args:  cobra.ExactArgs(2),
+		Use:     "add <source_code> <localpath>",
+		Aliases: []string{"create", "new"},
+		Short:   "Add a local source",
+		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openClientDB()
 			if err != nil {
@@ -240,11 +253,11 @@ func sourceAddCmd() *cobra.Command {
 
 func sourceRemoveCmd() *cobra.Command {
 	var purgeRemote bool
-
 	cmd := &cobra.Command{
-		Use:   "remove <source_code>",
-		Short: "Remove a local source",
-		Args:  cobra.ExactArgs(1),
+		Use:     "remove <source_code>",
+		Aliases: []string{"rm", "delete"},
+		Short:   "Remove a local source",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			db, err := openClientDB()
 			if err != nil {
@@ -287,6 +300,38 @@ func sourceRemoveCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&purgeRemote, "purge-remote", false, "Also purge remote data for this source")
 	return cmd
+}
+
+func sourceListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all local sources",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			db, err := openClientDB()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			rows, err := db.Query(`SELECT source_code, path FROM sources`)
+			if err != nil {
+				return fmt.Errorf("querying sources: %w", err)
+			}
+			defer rows.Close()
+
+			fmt.Printf("%-20s %-40s\n", "CODE", "PATH")
+			fmt.Printf("%-20s %-40s\n", "----", "----")
+			for rows.Next() {
+				var code, path string
+				if err := rows.Scan(&code, &path); err != nil {
+					return fmt.Errorf("scanning source: %w", err)
+				}
+				fmt.Printf("%-20s %-40s\n", code, path)
+			}
+			return nil
+		},
+	}
 }
 
 func sourceRefreshTokenCmd() *cobra.Command {
@@ -360,17 +405,19 @@ func scanCmd() *cobra.Command {
 	var parallelism int
 	var dryRun bool
 	var resetState bool
+	var verbose bool
 
 	cmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Scan all configured sources and sync to server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runScan(parallelism, dryRun, resetState)
+			return runScan(parallelism, dryRun, resetState, verbose)
 		},
 	}
 	cmd.Flags().IntVar(&parallelism, "parallelism", 4, "Number of concurrent event sends")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Scan only, do not connect to server or modify state")
 	cmd.Flags().BoolVar(&resetState, "reset-state", false, "Clear scan_state before scanning")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Display every path scanned")
 	return cmd
 }
 
@@ -386,7 +433,7 @@ func searchCmd() *cobra.Command {
 	return cmd
 }
 
-func runScan(parallelism int, dryRun, resetState bool) error {
+func runScan(parallelism int, dryRun, resetState, verbose bool) error {
 	clientDB, err := openClientDB()
 	if err != nil {
 		return err
@@ -523,7 +570,7 @@ func runScan(parallelism int, dryRun, resetState bool) error {
 		for _, src := range sources {
 			fmt.Printf("\nScanning source %q (%s)...\n", src.Code, src.Path)
 
-			currentFiles, err := scanner.WalkDirectory(src.Path)
+			currentFiles, err := scanner.WalkDirectory(src.Path, verbose)
 			if err != nil {
 				log.Printf("Error walking %s: %v", src.Path, err)
 				continue
@@ -652,7 +699,7 @@ func runScan(parallelism int, dryRun, resetState bool) error {
 		for _, src := range sources {
 			fmt.Printf("\nScanning source %q (%s)...\n", src.Code, src.Path)
 
-			currentFiles, err := scanner.WalkDirectory(src.Path)
+			currentFiles, err := scanner.WalkDirectory(src.Path, verbose)
 			if err != nil {
 				log.Printf("Error walking %s: %v", src.Path, err)
 				continue

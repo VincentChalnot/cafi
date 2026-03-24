@@ -64,4 +64,10 @@ message ServerMessage {
 service Indexer {
   // Sync is a bidirectional streaming RPC for synchronizing file events.
   rpc Sync(stream ClientMessage) returns (stream ServerMessage) {}
+
+  // Ping checks the connection and token validity.
+  rpc Ping(PingRequest) returns (PingResponse) {}
 }
+
+message PingRequest {}
+message PingResponse {}

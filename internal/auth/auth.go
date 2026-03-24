@@ -61,6 +61,24 @@ func (a *Interceptor) StreamInterceptor() grpc.StreamServerInterceptor {
 	}
 }
 
+// UnaryInterceptor returns a gRPC unary server interceptor that validates bearer tokens.
+func (a *Interceptor) UnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		userID, sourceIDs, err := a.authenticate(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Resolve source codes to IDs
+		sourceMap, err := a.db.GetSourceCodeToID(ctx, sourceIDs)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to resolve source codes")
+		}
+		ctx = context.WithValue(ctx, userIDKey, userID)
+		ctx = context.WithValue(ctx, sourceMapKey, sourceMap)
+		return handler(ctx, req)
+	}
+}
+
 func (a *Interceptor) authenticate(ctx context.Context) (int, []int, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
