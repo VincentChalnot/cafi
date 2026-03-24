@@ -1,0 +1,35 @@
+# Ignorer tout par défaut
+*
+
+# --- Fichiers à versionner (whitelist) ---
+
+# Permettre ce fichier lui-même
+!.gitignore
+
+# Configuration VCS (quel système de version control)
+!vcs.xml
+
+# Encodage des fichiers texte
+!encodings.xml
+
+# Style de code (indentation, formatting...)
+!codeStyleSettings.xml
+!codeStyles/
+!codeStyles/*
+
+# Modules et structure du projet
+!modules.xml
+!*.iml
+
+# Misc (SDK, language level du projet...)
+!misc.xml
+
+# Dictionnaires personnalisés et copyright
+!dictionaries/
+!dictionaries/*
+!copyrights/
+!copyrights/*
+
+# Inspection profiles partagés
+!inspectionProfiles/
+!inspectionProfiles/*
