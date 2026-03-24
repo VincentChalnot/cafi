@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/zeebo/blake3"
 )
 
@@ -48,25 +49,39 @@ type ScanResult struct {
 
 // WalkDirectory performs Step 1: recursive stat pass.
 // Returns a map of relative file paths to their FileStat.
-func WalkDirectory(root string, verbose bool) (map[string]FileStat, error) {
+func WalkDirectory(sourceName, root string, gitIgnore *ignore.GitIgnore, verbose bool) (map[string]FileStat, error) {
 	files := make(map[string]FileStat)
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if verbose {
-			fmt.Println(path)
-		}
 		if err != nil {
 			return nil // skip files we can't stat
 		}
+
+		relPath, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+
+		// Apply ignore rules
+		if gitIgnore != nil && relPath != "." {
+			if gitIgnore.MatchesPath(relPath) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+		}
+
+		if verbose && relPath != "." && !info.IsDir() {
+			fmt.Printf("%s:/%s\n", sourceName, relPath)
+		}
+
 		if info.IsDir() {
 			return nil
 		}
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-		relPath, err := filepath.Rel(root, path)
-		if err != nil {
-			return nil
-		}
+
 		files[relPath] = FileStat{
 			Path:  relPath,
 			Mtime: info.ModTime().Unix(),
