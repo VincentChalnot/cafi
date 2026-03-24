@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Indexer_Sync_FullMethodName = "/cafi.v1.Indexer/Sync"
+	Indexer_Ping_FullMethodName = "/cafi.v1.Indexer/Ping"
 )
 
 // IndexerClient is the client API for Indexer service.
@@ -30,6 +31,8 @@ const (
 type IndexerClient interface {
 	// Sync is a bidirectional streaming RPC for synchronizing file events.
 	Sync(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientMessage, ServerMessage], error)
+	// Ping checks the connection and token validity.
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 }
 
 type indexerClient struct {
@@ -53,6 +56,16 @@ func (c *indexerClient) Sync(ctx context.Context, opts ...grpc.CallOption) (grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Indexer_SyncClient = grpc.BidiStreamingClient[ClientMessage, ServerMessage]
 
+func (c *indexerClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PingResponse)
+	err := c.cc.Invoke(ctx, Indexer_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IndexerServer is the server API for Indexer service.
 // All implementations must embed UnimplementedIndexerServer
 // for forward compatibility.
@@ -61,6 +74,8 @@ type Indexer_SyncClient = grpc.BidiStreamingClient[ClientMessage, ServerMessage]
 type IndexerServer interface {
 	// Sync is a bidirectional streaming RPC for synchronizing file events.
 	Sync(grpc.BidiStreamingServer[ClientMessage, ServerMessage]) error
+	// Ping checks the connection and token validity.
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	mustEmbedUnimplementedIndexerServer()
 }
 
@@ -73,6 +88,9 @@ type UnimplementedIndexerServer struct{}
 
 func (UnimplementedIndexerServer) Sync(grpc.BidiStreamingServer[ClientMessage, ServerMessage]) error {
 	return status.Error(codes.Unimplemented, "method Sync not implemented")
+}
+func (UnimplementedIndexerServer) Ping(context.Context, *PingRequest) (*PingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedIndexerServer) mustEmbedUnimplementedIndexerServer() {}
 func (UnimplementedIndexerServer) testEmbeddedByValue()                 {}
@@ -102,13 +120,36 @@ func _Indexer_Sync_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Indexer_SyncServer = grpc.BidiStreamingServer[ClientMessage, ServerMessage]
 
+func _Indexer_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).Ping(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Indexer_ServiceDesc is the grpc.ServiceDesc for Indexer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Indexer_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "cafi.v1.Indexer",
 	HandlerType: (*IndexerServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Ping",
+			Handler:    _Indexer_Ping_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Sync",
